@@ -7,6 +7,8 @@
 struct gossip_getnodes_entry {
 	struct pubkey nodeid;
 	struct wireaddr *addresses;
+	u8 *alias;
+	u8 color[3];
 };
 
 struct gossip_getchannels_entry {

@@ -4,10 +4,15 @@
 
 void fromwire_gossip_getnodes_entry(const tal_t *ctx, const u8 **pptr, size_t *max, struct gossip_getnodes_entry *entry)
 {
-	u8 numaddresses, i;
+	u8 numaddresses, i, aliaslen;
 	fromwire_pubkey(pptr, max, &entry->nodeid);
-	numaddresses = fromwire_u8(pptr, max);
 
+	aliaslen = fromwire_u8(pptr, max);
+	entry->alias = tal_arr(ctx, u8, aliaslen);
+	fromwire_u8_array(pptr, max, entry->alias, aliaslen);
+	fromwire_u8_array(pptr, max, entry->color, sizeof(entry->color));
+
+	numaddresses = fromwire_u8(pptr, max);
 	entry->addresses = tal_arr(ctx, struct wireaddr, numaddresses);
 	for (i=0; i<numaddresses; i++) {
 		/* Gossipd doesn't hand us addresses we can't understand. */
@@ -20,9 +25,14 @@ void fromwire_gossip_getnodes_entry(const tal_t *ctx, const u8 **pptr, size_t *m
 void towire_gossip_getnodes_entry(u8 **pptr, const struct gossip_getnodes_entry *entry)
 {
 	u8 i, numaddresses = tal_count(entry->addresses);
+	u8 aliaslen = tal_len(entry->alias);
 	towire_pubkey(pptr, &entry->nodeid);
-	towire_u8(pptr, numaddresses);
 
+	towire_u8(pptr, aliaslen);
+	towire_u8_array(pptr, entry->alias, aliaslen);
+	towire_u8_array(pptr, entry->color, sizeof(entry->color));
+
+	towire_u8(pptr, numaddresses);
 	for (i=0; i<numaddresses; i++) {
 		towire_wireaddr(pptr, &entry->addresses[i]);
 	}

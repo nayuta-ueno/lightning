@@ -1110,6 +1110,8 @@ static struct io_plan *getnodes(struct io_conn *conn, struct daemon *daemon)
 		tal_resize(&nodes, node_count + 1);
 		nodes[node_count].nodeid = n->id;
 		nodes[node_count].addresses = n->addresses;
+		nodes[node_count].alias = n->alias;
+		*nodes[node_count].color = *n->rgb_color;
 		node_count++;
 		n = node_map_next(daemon->rstate->nodes, &i);
 	}

@@ -180,6 +180,7 @@ static void json_getnodes_reply(struct subd *gossip, const u8 *reply,
 	struct gossip_getnodes_entry *nodes;
 	struct json_result *response = new_json_result(cmd);
 	size_t i, j;
+	char alias[33];
 
 	if (!fromwire_gossip_getnodes_reply(reply, reply, NULL, &nodes)) {
 		command_fail(cmd, "Malformed gossip_getnodes response");
@@ -196,7 +197,12 @@ static void json_getnodes_reply(struct subd *gossip, const u8 *reply,
 		for (j=0; j<tal_count(nodes[i].addresses); j++) {
 			json_add_address(response, NULL, &nodes[i].addresses[j]);
 		}
+
+		memset(alias, 0, sizeof(alias));
+		memcpy(alias, nodes[i].alias, tal_len(nodes[i].alias));
 		json_array_end(response);
+		json_add_string(response, "alias", alias);
+		json_add_hex(response, "color", &nodes[i].color, sizeof(nodes[i].color));
 		json_object_end(response);
 	}
 	json_array_end(response);

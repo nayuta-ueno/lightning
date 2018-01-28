@@ -183,6 +183,7 @@ char *dbmigrations[] = {
     "UPDATE invoices"
     "   SET paid_timestamp = strftime('%s', 'now')"
     " WHERE state = 1;",
+    "CREATE TABLE transactions (txid BLOB, rawtx BLOB, block BLOB, height INT, UNIQUE(txid))",
     NULL,
 };
 

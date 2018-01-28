@@ -96,6 +96,20 @@ struct wallet_payment {
 	struct secret *path_secrets;
 };
 
+/* A transaction that we broadcast at one point or another and that
+ * we'd like to confirm. May be used to rebroadcast every once in a
+ * while. */
+struct wallet_transaction {
+	struct bitcoin_txid txid;
+	u8 *rawtx;
+
+	/* Hash of the block confirming the TX */
+	struct bitcoin_blkid *block;
+
+	/* Height at which this was confirmed, or 0 if unconfirmed */
+	u64 height;
+};
+
 /**
  * wallet_new - Constructor for a new sqlite3 based wallet
  *

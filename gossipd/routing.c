@@ -603,7 +603,9 @@ const struct short_channel_id *handle_channel_announcement(
 
 	/* FIXME: Handle duplicates as per BOLT #7 */
 	list_add_tail(&rstate->pending_cannouncement, &pending->list);
-	return &pending->short_channel_id;
+	//return &pending->short_channel_id;
+	handle_pending_cannouncement(rstate, &pending->short_channel_id, NULL);
+	return NULL;
 }
 
 /* While master always processes in order, bitcoind is async, so they could
@@ -628,7 +630,7 @@ bool handle_pending_cannouncement(struct routing_state *rstate,
 	bool forward, local;
 	struct node_connection *c0, *c1;
 	const char *tag;
-	const u8 *s;
+	//const u8 *s;
 	struct pending_cannouncement *pending;
 
 	pending = find_pending_cannouncement(rstate, scid);
@@ -642,11 +644,11 @@ bool handle_pending_cannouncement(struct routing_state *rstate,
 	 *
 	 * The receiving node MUST ignore the message if this output is spent.
 	 */
-	if (tal_len(outscript) == 0) {
-		status_trace("channel_announcement: no unspent txout %s", tag);
-		tal_free(pending);
-		return false;
-	}
+	//if (tal_len(outscript) == 0) {
+	//	status_trace("channel_announcement: no unspent txout %s", tag);
+	//	tal_free(pending);
+	//	return false;
+	//}
 
 	/* BOLT #7:
 	 *
@@ -656,17 +658,17 @@ bool handle_pending_cannouncement(struct routing_state *rstate,
 	 * specified in [BOLT
 	 * #3](03-transactions.md#funding-transaction-output).
 	 */
-	s = scriptpubkey_p2wsh(pending,
-			       bitcoin_redeem_2of2(pending,
-						   &pending->bitcoin_key_1,
-						   &pending->bitcoin_key_2));
+	//s = scriptpubkey_p2wsh(pending,
+	//		       bitcoin_redeem_2of2(pending,
+	//					   &pending->bitcoin_key_1,
+	//					   &pending->bitcoin_key_2));
 
-	if (!scripteq(s, outscript)) {
-		status_trace("channel_announcement: txout %s expectes %s, got %s",
-			     tag, tal_hex(trc, s), tal_hex(trc, outscript));
-		tal_free(pending);
-		return false;
-	}
+	//if (!scripteq(s, outscript)) {
+	//	status_trace("channel_announcement: txout %s expectes %s, got %s",
+	//		     tag, tal_hex(trc, s), tal_hex(trc, outscript));
+	//	tal_free(pending);
+	//	return false;
+	//}
 
 	/* Is this a new connection? It is if we don't know the
 	 * channel yet, or do not have a matching announcement in the

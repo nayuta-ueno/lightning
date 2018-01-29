@@ -588,6 +588,50 @@ static bool test_payment_crud(const tal_t *ctx)
 	return true;
 }
 
+static bool wtxeq(struct wallet_transaction *t1, struct wallet_transaction *t2)
+{
+	if (memcmp(&t1->txid, &t2->txid, sizeof(t1->txid)) != 0)
+		return false;
+	if (tal_len(t1->rawtx) != tal_len(t2->rawtx) || memcmp(t1->rawtx, t2->rawtx, tal_len(t1->rawtx)) != 0)
+		return false;
+	if (t1->height != t2->height)
+		return false;
+	if (t1->height && memcmp(t1->block, t2->block, sizeof(*t1->block)) != 0)
+		return false;
+	return true;
+}
+
+static bool test_wallet_transactions(const tal_t *ctx) {
+	struct wallet *w = create_test_wallet(ctx);
+
+	struct wallet_transaction t1, t2;
+	struct wallet_transaction **transactions;
+	t1.block = tal(ctx, struct bitcoin_blkid);
+
+	memset(&t2, 0, sizeof(t2));
+
+	memset(&t1.txid, 'A', sizeof(struct sha256_double));
+	t1.rawtx = tal_arr(ctx, u8, 100);
+	memset(t1.rawtx, 'A', 100);
+	memset(t1.block, 'B', sizeof(struct bitcoin_blkid));
+	t1.height = 1;
+
+	db_begin_transaction(w->db);
+	CHECK(!wtxeq(&t1, &t2));
+	CHECK(wallet_transaction_save(w, &t1));
+
+
+	transactions = wallet_transaction_list(ctx, w, NULL);
+	CHECK(tal_count(transactions) == 1);
+
+	t2 = *transactions[0];
+	CHECK(wtxeq(&t1, &t2));
+
+	db_commit_transaction(w->db);
+
+	return true;
+}
+
 int main(void)
 {
 	bool ok = true;
@@ -599,7 +643,7 @@ int main(void)
 	ok &= test_channel_config_crud(tmpctx);
 	ok &= test_htlc_crud(tmpctx);
 	ok &= test_payment_crud(tmpctx);
-
+	ok &= test_wallet_transactions(tmpctx);
 	tal_free(tmpctx);
 	return !ok;
 }

@@ -1605,10 +1605,15 @@ static void opening_got_hsm_funding_sig(struct funding_channel *fc,
 	u8 *linear;
 	u64 change_satoshi;
 	struct json_result *response = new_json_result(fc->cmd);
+	struct wallet_transaction *wtx;
 
 	if (!fromwire_hsm_sign_funding_reply(resp, NULL, tx))
 		fatal("HSM gave bad sign_funding_reply %s",
 		      tal_hex(fc, resp));
+
+	linear = linearize_tx(response, tx);
+	wtx = wallet_transaction_new(fc, fc->peer->funding_txid, linear);
+	wallet_transaction_save(fc->peer->ld->wallet, wtx);
 
 	/* Send it out and watch for confirms. */
 	broadcast_tx(fc->peer->ld->topology, fc->peer, tx, funding_broadcast_failed);
@@ -1624,7 +1629,6 @@ static void opening_got_hsm_funding_sig(struct funding_channel *fc,
 		  funding_spent, NULL);
 
 	json_object_start(response, NULL);
-	linear = linearize_tx(response, tx);
 	json_add_hex(response, "tx", linear, tal_len(linear));
 	json_add_txid(response, "txid", fc->peer->funding_txid);
 	json_object_end(response);

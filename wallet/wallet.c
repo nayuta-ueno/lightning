@@ -1484,3 +1484,71 @@ wallet_payment_list(const tal_t *ctx,
 
 	return payments;
 }
+
+bool wallet_transaction_save(struct wallet *w,
+			     const struct wallet_transaction *tx)
+{
+	sqlite3_stmt *stmt;
+	assert(tx->rawtx != NULL && tal_len(tx->rawtx) > 0);
+
+	stmt = db_prepare(
+	    w->db, "REPLACE INTO transactions (txid, rawtx, height, block) "
+		   "VALUES (?, ?, ?, ?);");
+
+	sqlite3_bind_sha256_double(stmt, 1, &tx->txid.shad);
+	sqlite3_bind_blob(stmt, 2, tx->rawtx, tal_len(tx->rawtx),
+			  SQLITE_TRANSIENT);
+
+	sqlite3_bind_int(stmt, 3, tx->height);
+	if (tx->block)
+		sqlite3_bind_sha256_double(stmt, 4, &tx->block->shad);
+	else
+		sqlite3_bind_null(stmt, 4);
+
+	return db_exec_prepared_mayfail(w->db, stmt);
+}
+
+static struct wallet_transaction *wallet_stmt2transaction(const tal_t *ctx,
+							  sqlite3_stmt *stmt)
+{
+	struct wallet_transaction *t = tal(ctx, struct wallet_transaction);
+	sqlite3_column_sha256_double(stmt, 0, &t->txid.shad);
+	t->rawtx = tal_arr(t, u8, sqlite3_column_bytes(stmt, 1));
+	memcpy(t->rawtx, sqlite3_column_blob(stmt, 1),
+	       sqlite3_column_bytes(stmt, 1));
+	t->height = sqlite3_column_int(stmt, 2);
+	if (sqlite3_column_type(stmt, 3) != SQLITE_NULL) {
+		t->block = tal(t, struct bitcoin_blkid);
+		sqlite3_column_sha256_double(stmt, 3, &t->block->shad);
+	} else {
+		t->block = NULL;
+	}
+
+	return t;
+}
+
+struct wallet_transaction **
+wallet_transaction_list(const tal_t *ctx, struct wallet *w,
+			const struct bitcoin_txid *txid)
+{
+	sqlite3_stmt *stmt;
+	size_t i;
+	struct wallet_transaction **transactions;
+
+	transactions = tal_arr(ctx, struct wallet_transaction *, 0);
+
+	if (txid != NULL) {
+		stmt = db_prepare(w->db, "SELECT  txid, rawtx, height, block "
+					 "FROM transactions WHERE txid = ?;");
+		sqlite3_bind_sha256_double(stmt, 1, &txid->shad);
+	} else {
+		stmt = db_prepare(w->db, "SELECT  txid, rawtx, height, block "
+					 "FROM transactions;");
+	}
+	for (i = 0; sqlite3_step(stmt) == SQLITE_ROW; i++) {
+		tal_resize(&transactions, i + 1);
+		transactions[i] = wallet_stmt2transaction(ctx, stmt);
+	}
+	sqlite3_finalize(stmt);
+	return transactions;
+}

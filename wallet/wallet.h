@@ -618,4 +618,16 @@ const struct wallet_payment **wallet_payment_list(const tal_t *ctx,
 						  struct wallet *wallet,
 						  const struct sha256 *payment_hash);
 
+/**
+ * wallet_transaction_save -- Store a transaction in the DB
+ *
+ * Upserts the transaction into the DB.
+ */
+bool wallet_transaction_save(struct wallet *w,
+			     const struct wallet_transaction *tx);
+
+struct wallet_transaction **
+wallet_transaction_list(const tal_t *ctx, struct wallet *w,
+			const struct bitcoin_txid *txid);
+
 #endif /* WALLET_WALLET_H */

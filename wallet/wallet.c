@@ -1438,6 +1438,18 @@ void wallet_payment_set_status(struct wallet *wallet,
 	}
 }
 
+struct wallet_transaction *wallet_transaction_new(const tal_t *ctx,
+						  const struct bitcoin_txid *id,
+						  const u8 *rawtx TAKES)
+{
+	struct wallet_transaction *t = tal(ctx, struct wallet_transaction);
+	t->txid = *id;
+	t->rawtx = tal_dup_arr(ctx, u8, rawtx, tal_len(rawtx), 0);
+	t->height = 0;
+	t->block = NULL;
+	return t;
+}
+
 const struct wallet_payment **
 wallet_payment_list(const tal_t *ctx,
 		    struct wallet *wallet,

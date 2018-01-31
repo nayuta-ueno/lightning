@@ -22,6 +22,29 @@ static struct queued_message *new_queued_message(tal_t *ctx,
 	return msg;
 }
 
+bool replace_broadcast(struct broadcast_state *bstate, u64 *index,
+		       const int type, const u8 *tag, const u8 *payload)
+{
+	struct queued_message *msg;
+	bool evicted = false;
+
+	msg = uintmap_get(&bstate->broadcasts, *index);
+	if (msg && msg->type == type && memcmp(msg->tag, tag, tal_len(tag)) == 0) {
+		uintmap_del(&bstate->broadcasts, *index);
+		tal_free(msg);
+		evicted = true;
+	}
+
+	memcheck(tag, tal_len(tag));
+
+	*index = bstate->next_index;
+	/* Now add the message to the queue */
+	msg = new_queued_message(bstate, type, tag, payload);
+	uintmap_add(&bstate->broadcasts, *index, msg);
+	bstate->next_index += 1;
+	return evicted;
+}
+
 bool queue_broadcast(struct broadcast_state *bstate,
 		     const int type,
 		     const u8 *tag,

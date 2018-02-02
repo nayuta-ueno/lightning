@@ -81,8 +81,6 @@ HTABLE_DEFINE_TYPE(struct pending_node_announce, pending_node_announce_keyof,
 enum gossip_msg_indexes {
 	MSG_INDEX_CUPDATE_0,
 	MSG_INDEX_CUPDATE_1,
-	MSG_INDEX_NANNOUNCE_0,
-	MSG_INDEX_NANNOUNCE_1,
 	MSG_INDEX_CANNOUNCE
 };
 

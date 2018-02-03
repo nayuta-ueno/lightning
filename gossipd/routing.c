@@ -563,11 +563,17 @@ static struct pending_cannouncement *
 find_pending_cannouncement(struct routing_state *rstate,
 			   const struct short_channel_id *scid)
 {
-	struct pending_cannouncement *i;
+	struct pending_cannouncement *i, *j = NULL;
+	struct routing_channel *chan = uintmap_get(&rstate->channels, short_channel_id_to_uint(scid));
+	if (chan && chan->pending)
+		j = chan->pending;
 
 	list_for_each(&rstate->pending_cannouncement, i, list) {
-		if (short_channel_id_eq(scid, &i->short_channel_id))
-			return i;
+		if (short_channel_id_eq(scid, &i->short_channel_id)) {
+			status_trace("CHAN %p, i=%p, j=%p", chan, i, j);
+			assert(i == j);
+			return j;
+		}
 	}
 	return NULL;
 }
@@ -582,6 +588,7 @@ struct routing_channel *routing_channel_new(const tal_t *ctx,
 	chan->txout_script = NULL;
 	chan->state = TXOUT_FETCHING;
 	chan->public = false;
+	chan->pending = NULL;
 	memset(&chan->msg_indexes, 0, sizeof(chan->msg_indexes));
 	return chan;
 }
@@ -729,8 +736,12 @@ const struct short_channel_id *handle_channel_announcement(
 		     type_to_string(pending, struct short_channel_id,
 				    &pending->short_channel_id));
 
+	assert(!find_pending_cannouncement(rstate, &pending->short_channel_id));
 	/* So you're new in town, ey? Let's find you a room in the Inn. */
-	chan = routing_channel_new(chan, &pending->short_channel_id);
+	if (chan == NULL)
+		chan = routing_channel_new(chan, &pending->short_channel_id);
+	assert(pending);
+	chan->pending = tal_steal(chan, pending);
 
 	/* The channel will be public if we complete the verification */
 	chan->public = true;

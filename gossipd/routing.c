@@ -736,12 +736,11 @@ const struct short_channel_id *handle_channel_announcement(
 		     type_to_string(pending, struct short_channel_id,
 				    &pending->short_channel_id));
 
-	assert(!find_pending_cannouncement(rstate, &pending->short_channel_id));
 	/* So you're new in town, ey? Let's find you a room in the Inn. */
 	if (chan == NULL)
 		chan = routing_channel_new(chan, &pending->short_channel_id);
 	assert(pending);
-	chan->pending = tal_steal(chan, pending);
+	chan->pending = pending;
 
 	/* The channel will be public if we complete the verification */
 	chan->public = true;
@@ -771,8 +770,9 @@ bool handle_pending_cannouncement(struct routing_state *rstate,
 	chan = uintmap_get(&rstate->channels, uscid);
 	assert(chan);
 
-	pending = find_pending_cannouncement(rstate, scid);
+	pending = chan->pending;
 	assert(pending);
+	chan->pending = NULL;
 	list_del_from(&rstate->pending_cannouncement, &pending->list);
 
 	tag = tal_arr(pending, u8, 0);
@@ -859,9 +859,12 @@ static bool update_to_pending(struct routing_state *rstate,
 			      u32 timestamp, const u8 *update,
 			      const u8 direction)
 {
-	struct pending_cannouncement *pending;
+	u64 uscid = short_channel_id_to_uint(scid);
+	struct routing_channel *chan = uintmap_get(&rstate->channels, uscid);
+	struct pending_cannouncement *pending, *p2 = chan?chan->pending:NULL;
 
 	pending = find_pending_cannouncement(rstate, scid);
+	status_trace("PENDING %p %p", pending, p2);
 	if (!pending)
 		return false;
 

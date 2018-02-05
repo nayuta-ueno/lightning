@@ -326,7 +326,7 @@ static void json_newaddr(struct command *cmd,
 	char *out;
 	const char *hrp;
 
-	if (!json_get_params(buffer, params, "?addresstype", &addrtype, NULL)) {
+	if (!json_get_params(cmd, buffer, params, "?addresstype", &addrtype, NULL)) {
 		command_fail(cmd, "Invalid arguments");
 		return;
 	}

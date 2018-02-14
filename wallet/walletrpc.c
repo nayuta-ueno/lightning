@@ -445,14 +445,14 @@ static void json_listaddrs(struct command *cmd,
 			return;
 		}
 
-		// p2sh
+		/* P2SH */
 		redeemscript = bitcoin_redeem_p2sh_p2wpkh(cmd, &pubkey);
 		sha256(&h, redeemscript, tal_count(redeemscript));
 		ripemd160(&h160, h.u.u8, sizeof(h));
 		out_p2sh = p2sh_to_base58(cmd,
 								  get_chainparams(cmd->ld)->testnet, &h160);
 
-		// bech32 : p2wpkh
+		/* bech32-P2WPKH */
 		hrp = get_chainparams(cmd->ld)->bip173_name;
 		/* out buffer is 73 + strlen(human readable part). see bech32.h */
 		out_p2wpkh = tal_arr(cmd, char, 73 + strlen(hrp));
@@ -464,7 +464,7 @@ static void json_listaddrs(struct command *cmd,
 			return;
 		}
 
-		// outputs
+		/* outputs */
 		json_object_start(response, NULL);
 		json_add_u64(response, "keyidx", keyidx);
 		json_add_pubkey(response, "pubkey", &pubkey);

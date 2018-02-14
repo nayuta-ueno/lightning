@@ -534,7 +534,7 @@ static bool send_payment(struct command *cmd,
 		log_add(cmd->ld->log, "... retrying");
 	}
 
-	channel = active_channel_by_id(cmd->ld, &ids[0]);
+	channel = active_channel_by_id(cmd->ld, &ids[0], NULL);
 	if (!channel) {
 		/* Report routing failure to gossipd */
 		fail = immediate_routing_failure(cmd, cmd->ld,

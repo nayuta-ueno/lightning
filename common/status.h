@@ -2,8 +2,8 @@
 #define LIGHTNING_COMMON_STATUS_H
 #include "config.h"
 #include <ccan/compiler/compiler.h>
-#include <ccan/take/take.h>
 #include <ccan/short_types/short_types.h>
+#include <ccan/take/take.h>
 #include <common/htlc.h> /* For enum side */
 #include <common/status_levels.h>
 #include <stdarg.h>

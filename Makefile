@@ -157,9 +157,9 @@ ALL_PROGRAMS =
 CPPFLAGS = -DBINTOPKGLIBEXECDIR='"'$(shell sh tools/rel.sh $(bindir) $(pkglibexecdir))'"'
 CWARNFLAGS := -Werror -Wall -Wundef -Wmissing-prototypes -Wmissing-declarations -Wstrict-prototypes -Wold-style-definition
 CDEBUGFLAGS := -std=gnu11 -g -fstack-protector
-CFLAGS = $(CPPFLAGS) $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) $(EXTERNAL_INCLUDE_FLAGS) -I . -I/usr/local/include $(FEATURES) $(COVFLAGS) $(DEV_CFLAGS) -DSHACHAIN_BITS=48 -DJSMN_PARENT_LINKS $(PIE_CFLAGS)
+CFLAGS = $(CPPFLAGS) $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) $(EXTERNAL_INCLUDE_FLAGS) -I . $(FEATURES) $(COVFLAGS) $(DEV_CFLAGS) -DSHACHAIN_BITS=48 -DJSMN_PARENT_LINKS $(PIE_CFLAGS)
 
-LDFLAGS = -L/usr/local/lib $(PIE_LDFLAGS)
+LDFLAGS = $(PIE_LDFLAGS)
 LDLIBS = -lm -lgmp -lsqlite3 $(COVFLAGS)
 
 default: all-programs all-test-programs

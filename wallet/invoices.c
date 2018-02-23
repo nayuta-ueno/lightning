@@ -325,6 +325,10 @@ bool invoices_create(struct invoices *invoices,
 		install_expiration_timer(invoices);
 	}
 
+	if (taken(msatoshi))
+		tal_free(msatoshi);
+	if (taken(label))
+		tal_free(label);
 	return true;
 }
 

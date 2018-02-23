@@ -94,34 +94,37 @@ u8 *get_supported_global_features(const tal_t *ctx UNNEEDED)
 /* Generated stub for get_supported_local_features */
 u8 *get_supported_local_features(const tal_t *ctx UNNEEDED)
 { fprintf(stderr, "get_supported_local_features called!\n"); abort(); }
+/* Generated stub for invoices_all */
+struct invoice *invoices_all(const tal_t *ctx UNNEEDED,
+			     struct invoices *invoices UNNEEDED)
+{ fprintf(stderr, "invoices_all called!\n"); abort(); }
 /* Generated stub for invoices_create */
-const struct invoice *invoices_create(struct invoices *invoices UNNEEDED,
-				      u64 *msatoshi TAKES UNNEEDED,
-				      const char *label TAKES UNNEEDED,
-				      u64 expiry UNNEEDED)
+bool invoices_create(struct invoices *invoices UNNEEDED,
+		     struct invoice *pinvoice UNNEEDED,
+		     u64 *msatoshi TAKES UNNEEDED,
+		     const char *label TAKES UNNEEDED,
+		     u64 expiry UNNEEDED)
 { fprintf(stderr, "invoices_create called!\n"); abort(); }
 /* Generated stub for invoices_delete */
 bool invoices_delete(struct invoices *invoices UNNEEDED,
-		     const struct invoice *invoice UNNEEDED)
+		     struct invoice invoice UNNEEDED)
 { fprintf(stderr, "invoices_delete called!\n"); abort(); }
 /* Generated stub for invoices_find_by_label */
-const struct invoice *invoices_find_by_label(struct invoices *invoices UNNEEDED,
-					     const char *label UNNEEDED)
+bool invoices_find_by_label(struct invoices *invoices UNNEEDED,
+			    struct invoice *pinvoice UNNEEDED,
+			    const char *label UNNEEDED)
 { fprintf(stderr, "invoices_find_by_label called!\n"); abort(); }
 /* Generated stub for invoices_find_unpaid */
-const struct invoice *invoices_find_unpaid(struct invoices *invoices UNNEEDED,
-					   const struct sha256 *rhash UNNEEDED)
+bool invoices_find_unpaid(struct invoices *invoices UNNEEDED,
+			  struct invoice *pinvoice UNNEEDED,
+			  const struct sha256 *rhash UNNEEDED)
 { fprintf(stderr, "invoices_find_unpaid called!\n"); abort(); }
 /* Generated stub for invoices_get_details */
 void invoices_get_details(const tal_t *ctx UNNEEDED,
 			  struct invoices *invoices UNNEEDED,
-			  const struct invoice *invoice UNNEEDED,
+			  struct invoice invoice UNNEEDED,
 			  struct invoice_details *details UNNEEDED)
 { fprintf(stderr, "invoices_get_details called!\n"); abort(); }
-/* Generated stub for invoices_iterate */
-const struct invoice *invoices_iterate(struct invoices *invoices UNNEEDED,
-				       const struct invoice *invoice UNNEEDED)
-{ fprintf(stderr, "invoices_iterate called!\n"); abort(); }
 /* Generated stub for invoices_load */
 bool invoices_load(struct invoices *invoices UNNEEDED)
 { fprintf(stderr, "invoices_load called!\n"); abort(); }
@@ -133,7 +136,7 @@ struct invoices *invoices_new(const tal_t *ctx UNNEEDED,
 { fprintf(stderr, "invoices_new called!\n"); abort(); }
 /* Generated stub for invoices_resolve */
 void invoices_resolve(struct invoices *invoices UNNEEDED,
-		      const struct invoice *invoice UNNEEDED,
+		      struct invoice invoice UNNEEDED,
 		      u64 msatoshi_received UNNEEDED)
 { fprintf(stderr, "invoices_resolve called!\n"); abort(); }
 /* Generated stub for invoices_waitany */
@@ -146,7 +149,7 @@ void invoices_waitany(const tal_t *ctx UNNEEDED,
 /* Generated stub for invoices_waitone */
 void invoices_waitone(const tal_t *ctx UNNEEDED,
 		      struct invoices *invoices UNNEEDED,
-		      struct invoice const *invoice UNNEEDED,
+		      struct invoice invoice UNNEEDED,
 		      void (*cb)(const struct invoice * UNNEEDED, void*) UNNEEDED,
 		      void *cbarg UNNEEDED)
 { fprintf(stderr, "invoices_waitone called!\n"); abort(); }
@@ -236,9 +239,6 @@ void log_add(struct log *log UNNEEDED, const char *fmt UNNEEDED, ...)
 void log_io(struct log *log UNNEEDED, enum log_level dir UNNEEDED, const char *comment UNNEEDED,
 	    const void *data UNNEEDED, size_t len UNNEEDED)
 { fprintf(stderr, "log_io called!\n"); abort(); }
-/* Generated stub for logv_add */
-void logv_add(struct log *log UNNEEDED, const char *fmt UNNEEDED, va_list ap UNNEEDED)
-{ fprintf(stderr, "logv_add called!\n"); abort(); }
 /* Generated stub for new_json_result */
 struct json_result *new_json_result(const tal_t *ctx UNNEEDED)
 { fprintf(stderr, "new_json_result called!\n"); abort(); }

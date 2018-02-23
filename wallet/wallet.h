@@ -392,15 +392,8 @@ struct invoice_details {
 
 struct invoice {
 	/* Internal, rest of lightningd should not use */
-	/* List off ld->wallet->invoices. Must be first or else
-	 * dev-memleak is driven insane. */
-	struct list_node list;
 	/* Database ID */
 	u64 id;
-	/* The owning invoices object. */
-	struct invoices *owner;
-	/* Loaded details. */
-	struct invoice_details *details;
 };
 
 #define INVOICE_MAX_LABEL_LEN 128
@@ -423,6 +416,7 @@ bool wallet_invoice_load(struct wallet *wallet);
  * wallet_invoice_create - Create a new invoice.
  *
  * @wallet - the wallet to create the invoice in.
+ * @pinvoice - pointer to location to load new invoice in.
  * @msatoshi - the amount the invoice should have, or
  * NULL for any-amount invoices.
  * @label - the unique label for this invoice. Must be
@@ -430,36 +424,44 @@ bool wallet_invoice_load(struct wallet *wallet);
  * @expiry - the number of seconds before the invoice
  * expires
  *
- * Returns NULL if label already exists or expiry is 0.
+ * Returns false if label already exists or expiry is 0.
+ * Returns true if created invoice.
  * FIXME: Fallback addresses
  */
-const struct invoice *wallet_invoice_create(struct wallet *wallet,
-					    u64 *msatoshi TAKES,
-					    const char *label TAKES,
-					    u64 expiry);
+bool wallet_invoice_create(struct wallet *wallet,
+			   struct invoice *pinvoice,
+			   u64 *msatoshi TAKES,
+			   const char *label TAKES,
+			   u64 expiry);
 
 /**
  * wallet_invoice_find_by_label - Search for an invoice by label
  *
  * @wallet - the wallet to search.
+ * @pinvoice - pointer to location to load found invoice in.
  * @label - the label to search for. Must be null-terminated.
  *
- * Returns NULL if no invoice with that label exists.
+ * Returns false if no invoice with that label exists.
+ * Returns true if found.
  */
-const struct invoice *wallet_invoice_find_by_label(struct wallet *wallet,
-						   const char *label);
+bool wallet_invoice_find_by_label(struct wallet *wallet,
+				  struct invoice *pinvoice,
+				  const char *label);
 
 /**
  * wallet_invoice_find_unpaid - Search for an unpaid, unexpired invoice by
  * payment_hash
  *
  * @wallet - the wallet to search.
+ * @pinvoice - pointer to location to load found invoice in.
  * @rhash - the payment_hash to search for.
  *
- * Returns NULL if no invoice with that payment hash exists.
+ * Returns false if no unpaid invoice with that rhash exists.
+ * Returns true if found.
  */
-const struct invoice *wallet_invoice_find_unpaid(struct wallet *wallet,
-						 const struct sha256 *rhash);
+bool wallet_invoice_find_unpaid(struct wallet *wallet,
+				struct invoice *pinvoice,
+				const struct sha256 *rhash);
 
 /**
  * wallet_invoice_delete - Delete an invoice
@@ -470,24 +472,18 @@ const struct invoice *wallet_invoice_find_unpaid(struct wallet *wallet,
  * Return false on failure.
  */
 bool wallet_invoice_delete(struct wallet *wallet,
-			   const struct invoice *invoice);
+			   struct invoice invoice);
 
 /**
- * wallet_invoice_iterate - Iterate over all existing invoices
+ * wallet_invoice_all - Return a tal_arr of invoices.
  *
- * @wallet - the wallet whose invoices are to be iterated over.
- * @invoice - the previous invoice you iterated over.
+ * @ctx - the context to allocate from
+ * @wallet - the wallet being queried
  *
- * Return NULL at end-of-sequence. Usage:
- *
- *   const struct invoice *i;
- *   i = NULL;
- *   while ((i = wallet_invoice_iterate(wallet, i))) {
- *       ...
- *   }
+ * Always returns some non-null array.
  */
-const struct invoice *wallet_invoice_iterate(struct wallet *wallet,
-					     const struct invoice *invoice);
+struct invoice *wallet_invoice_all(const tal_t *ctx,
+				   struct wallet *wallet);
 
 /**
  * wallet_invoice_resolve - Mark an invoice as paid
@@ -497,10 +493,10 @@ const struct invoice *wallet_invoice_iterate(struct wallet *wallet,
  * @msatoshi_received - the actual amount received.
  *
  * Precondition: the invoice must not yet be expired (wallet
- * does not check).
+ * does not check!).
  */
 void wallet_invoice_resolve(struct wallet *wallet,
-			    const struct invoice *invoice,
+			    struct invoice invoice,
 			    u64 msatoshi_received);
 
 /**
@@ -514,7 +510,8 @@ void wallet_invoice_resolve(struct wallet *wallet,
  * @cb - the callback to invoke. If an invoice is already
  * paid with pay_index greater than lastpay_index, this
  * is called immediately, otherwise it is called during
- * an invoices_resolve call.
+ * an invoices_resolve call. Will never be given a NULL
+ * pointer-to-invoice.
  * @cbarg - the callback data.
  */
 void wallet_invoice_waitany(const tal_t *ctx,
@@ -541,7 +538,7 @@ void wallet_invoice_waitany(const tal_t *ctx,
  */
 void wallet_invoice_waitone(const tal_t *ctx,
 			    struct wallet *wallet,
-			    struct invoice const *invoice,
+			    struct invoice invoice,
 			    void (*cb)(const struct invoice *, void*),
 			    void *cbarg);
 
@@ -555,7 +552,7 @@ void wallet_invoice_waitone(const tal_t *ctx,
  */
 void wallet_invoice_details(const tal_t *ctx,
 			    struct wallet *wallet,
-			    const struct invoice *invoice,
+			    struct invoice invoice,
 			    struct invoice_details *details);
 
 /**

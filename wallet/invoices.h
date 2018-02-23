@@ -38,6 +38,7 @@ bool invoices_load(struct invoices *invoices);
  * invoices_create - Create a new invoice.
  *
  * @invoices - the invoice handler.
+ * @pinvoice - pointer to location to load new invoice in.
  * @msatoshi - the amount the invoice should have, or
  * NULL for any-amount invoices.
  * @label - the unique label for this invoice. Must be
@@ -45,36 +46,44 @@ bool invoices_load(struct invoices *invoices);
  * @expiry - the number of seconds before the invoice
  * expires
  *
- * Returns NULL if label already exists or expiry is 0.
+ * Returns false if label already exists or expiry is 0.
+ * Returns true if created invoice.
  * FIXME: Fallback addresses
  */
-const struct invoice *invoices_create(struct invoices *invoices,
-				      u64 *msatoshi TAKES,
-				      const char *label TAKES,
-				      u64 expiry);
+bool invoices_create(struct invoices *invoices,
+		     struct invoice *pinvoice,
+		     u64 *msatoshi TAKES,
+		     const char *label TAKES,
+		     u64 expiry);
 
 /**
  * invoices_find_by_label - Search for an invoice by label
  *
  * @invoices - the invoice handler.
+ * @pinvoice - pointer to location to load found invoice in.
  * @label - the label to search for. Must be null-terminated.
  *
- * Returns NULL if no invoice with that label exists.
+ * Returns false if no invoice with that label exists.
+ * Returns true if found.
  */
-const struct invoice *invoices_find_by_label(struct invoices *invoices,
-					     const char *label);
+bool invoices_find_by_label(struct invoices *invoices,
+			    struct invoice *pinvoice,
+			    const char *label);
 
 /**
  * invoices_find_unpaid - Search for an unpaid, unexpired invoice by
  * payment_hash
  *
  * @invoices - the invoice handler.
+ * @pinvoice - pointer to location to load found invoice in.
  * @rhash - the payment_hash to search for.
  *
- * Returns NULL if no invoice with that payment hash exists.
+ * Returns false if no unpaid invoice with that rhash exists.
+ * Returns true if found.
  */
-const struct invoice *invoices_find_unpaid(struct invoices *invoices,
-					   const struct sha256 *rhash);
+bool invoices_find_unpaid(struct invoices *invoices,
+			  struct invoice *pinvoice,
+			  const struct sha256 *rhash);
 
 /**
  * invoices_delete - Delete an invoice
@@ -85,24 +94,18 @@ const struct invoice *invoices_find_unpaid(struct invoices *invoices,
  * Return false on failure.
  */
 bool invoices_delete(struct invoices *invoices,
-		     const struct invoice *invoice);
+		     struct invoice invoice);
 
 /**
- * invoices_iterate - Iterate over all existing invoices
+ * invoices_all - Return a tal_arr of invoices.
  *
- * @invoices - the invoice handler.
- * @invoice - the previous invoice you iterated over.
+ * @ctx - the context to allocate from
+ * @invoices - the invoice handler
  *
- * Return NULL at end-of-sequence. Usage:
- *
- *   const struct invoice *i;
- *   i = NULL;
- *   while ((i = invoices_iterate(invoices, i))) {
- *       ...
- *   }
+ * Always returns some non-null array.
  */
-const struct invoice *invoices_iterate(struct invoices *invoices,
-				       const struct invoice *invoice);
+struct invoice *invoices_all(const tal_t *ctx,
+			     struct invoices *invoices);
 
 /**
  * invoices_resolve - Mark an invoice as paid
@@ -115,7 +118,7 @@ const struct invoice *invoices_iterate(struct invoices *invoices,
  * does not check).
  */
 void invoices_resolve(struct invoices *invoices,
-		      const struct invoice *invoice,
+		      struct invoice invoice,
 		      u64 msatoshi_received);
 
 /**
@@ -156,7 +159,7 @@ void invoices_waitany(const tal_t *ctx,
  */
 void invoices_waitone(const tal_t *ctx,
 		      struct invoices *invoices,
-		      struct invoice const *invoice,
+		      struct invoice invoice,
 		      void (*cb)(const struct invoice *, void*),
 		      void *cbarg);
 
@@ -170,7 +173,7 @@ void invoices_waitone(const tal_t *ctx,
  */
 void invoices_get_details(const tal_t *ctx,
 			  struct invoices *invoices,
-			  const struct invoice *invoice,
+			  struct invoice invoice,
 			  struct invoice_details *details);
 
 #endif /* LIGHTNING_WALLET_INVOICES_H */

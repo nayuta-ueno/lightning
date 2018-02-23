@@ -1266,34 +1266,36 @@ bool wallet_invoice_load(struct wallet *wallet)
 {
 	return invoices_load(wallet->invoices);
 }
-const struct invoice *wallet_invoice_create(struct wallet *wallet,
-					    u64 *msatoshi TAKES,
-					    const char *label TAKES,
-					    u64 expiry) {
-	return invoices_create(wallet->invoices, msatoshi, label, expiry);
+bool wallet_invoice_create(struct wallet *wallet,
+			   struct invoice *pinvoice,
+			   u64 *msatoshi TAKES,
+			   const char *label TAKES,
+			   u64 expiry) {
+	return invoices_create(wallet->invoices, pinvoice, msatoshi, label, expiry);
 }
-const struct invoice *wallet_invoice_find_by_label(struct wallet *wallet,
-						   const char *label)
+bool wallet_invoice_find_by_label(struct wallet *wallet,
+				  struct invoice *pinvoice,
+				  const char *label)
 {
-	return invoices_find_by_label(wallet->invoices, label);
+	return invoices_find_by_label(wallet->invoices, pinvoice, label);
 }
-const struct invoice *wallet_invoice_find_unpaid(struct wallet *wallet,
-						 const struct sha256 *rhash)
+bool wallet_invoice_find_unpaid(struct wallet *wallet,
+				struct invoice *pinvoice,
+				const struct sha256 *rhash)
 {
-	return invoices_find_unpaid(wallet->invoices, rhash);
+	return invoices_find_unpaid(wallet->invoices, pinvoice, rhash);
 }
 bool wallet_invoice_delete(struct wallet *wallet,
-			   const struct invoice *invoice)
+			   struct invoice invoice)
 {
 	return invoices_delete(wallet->invoices, invoice);
 }
-const struct invoice *wallet_invoice_iterate(struct wallet *wallet,
-					     const struct invoice *invoice)
+struct invoice *wallet_invoice_all(const tal_t *ctx, struct wallet *wallet)
 {
-	return invoices_iterate(wallet->invoices, invoice);
+	return invoices_all(ctx, wallet->invoices);
 }
 void wallet_invoice_resolve(struct wallet *wallet,
-			    const struct invoice *invoice,
+			    struct invoice invoice,
 			    u64 msatoshi_received)
 {
 	invoices_resolve(wallet->invoices, invoice, msatoshi_received);
@@ -1308,7 +1310,7 @@ void wallet_invoice_waitany(const tal_t *ctx,
 }
 void wallet_invoice_waitone(const tal_t *ctx,
 			    struct wallet *wallet,
-			    struct invoice const *invoice,
+			    struct invoice invoice,
 			    void (*cb)(const struct invoice *, void*),
 			    void *cbarg)
 {
@@ -1316,7 +1318,7 @@ void wallet_invoice_waitone(const tal_t *ctx,
 }
 void wallet_invoice_details(const tal_t *ctx,
 			    struct wallet *wallet,
-			    const struct invoice *invoice,
+			    struct invoice invoice,
 			    struct invoice_details *details)
 {
 	invoices_get_details(ctx, wallet->invoices, invoice, details);

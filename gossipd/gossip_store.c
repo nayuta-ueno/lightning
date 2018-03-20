@@ -9,12 +9,17 @@
 #define GOSSIP_STORE_FILENAME "gossip_store"
 
 struct gossip_store {
-	int read_fd, write_fd;
+	int fd;
 
 	/* What was the size of the gossip_store when we started replaying
 	 * it? */
 	__off_t replaysize;
 };
+
+static void gossip_store_destroy(struct gossip_store *gs)
+{
+	close(gs->fd);
+}
 
 struct gossip_store *gossip_store_new(const tal_t *ctx)
 {
@@ -22,6 +27,8 @@ struct gossip_store *gossip_store_new(const tal_t *ctx)
 	gs->write_fd = open(GOSSIP_STORE_FILENAME, O_RDWR|O_APPEND|O_CREAT, 0600);
 	gs->read_fd = open(GOSSIP_STORE_FILENAME, O_RDONLY);
 	gs->replaysize = lseek(gs->write_fd, 0, SEEK_END);
+
+	tal_add_destructor(gs, gossip_store_destroy);
 
 	return gs;
 }

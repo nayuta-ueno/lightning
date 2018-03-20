@@ -51,6 +51,9 @@ struct pending_cannouncement {
 
 	/* Only ever replace with newer updates */
 	u32 update_timestamps[2];
+
+	/* Was this from a peer and should be stored? */
+	bool store;
 };
 
 struct pending_node_announce {
@@ -549,7 +552,8 @@ static void add_pending_node_announcement(struct routing_state *rstate, struct p
 }
 
 static void process_pending_node_announcement(struct routing_state *rstate,
-					      struct pubkey *nodeid)
+					      struct pubkey *nodeid,
+					      bool store)
 {
 	struct pending_node_announce *pna = pending_node_map_get(rstate->pending_node_map, &nodeid->pubkey);
 	if (!pna)
@@ -562,7 +566,7 @@ static void process_pending_node_announcement(struct routing_state *rstate,
 		    type_to_string(pna, struct pubkey, nodeid));
 
 		/* Should not error, since we processed it before */
-		err = handle_node_announcement(rstate, pna->node_announcement);
+		err = handle_node_announcement(rstate, pna->node_announcement, store);
 		if (err)
 			status_failed(STATUS_FAIL_INTERNAL_ERROR,
 				      "pending node_announcement %s malformed %s?",
@@ -594,7 +598,8 @@ static void destroy_pending_cannouncement(struct pending_cannouncement *pending,
 
 u8 *handle_channel_announcement(struct routing_state *rstate,
 				const u8 *announce TAKES,
-				const struct short_channel_id **scid)
+				const struct short_channel_id **scid,
+				bool store)
 {
 	struct pending_cannouncement *pending;
 	struct bitcoin_blkid chain_hash;
@@ -606,6 +611,7 @@ u8 *handle_channel_announcement(struct routing_state *rstate,
 	pending = tal(rstate, struct pending_cannouncement);
 	pending->updates[0] = NULL;
 	pending->updates[1] = NULL;
+	pending->store = store;
 	pending->announce = tal_dup_arr(pending, u8,
 					announce, tal_len(announce), 0);
 	pending->update_timestamps[0] = pending->update_timestamps[1] = 0;
@@ -728,7 +734,7 @@ ignored:
 
 static void process_pending_channel_update(struct routing_state *rstate,
 					   const struct short_channel_id *scid,
-					   const u8 *cupdate)
+					   const u8 *cupdate, bool store)
 {
 	u8 *err;
 
@@ -736,7 +742,7 @@ static void process_pending_channel_update(struct routing_state *rstate,
 		return;
 
 	/* FIXME: We don't remember who sent us updates, so can't error them */
-	err = handle_channel_update(rstate, cupdate);
+	err = handle_channel_update(rstate, cupdate, store);
 	if (err) {
 		status_trace("Pending channel_update for %s: %s",
 			     type_to_string(tmpctx, struct short_channel_id, scid),
@@ -813,17 +819,18 @@ bool handle_pending_cannouncement(struct routing_state *rstate,
 			      "Announcement %s was replaced?",
 			      tal_hex(tmpctx, pending->announce));
 
-	gossip_store_append(rstate->store, pending->announce);
+	if (pending->store)
+		gossip_store_append(rstate->store, pending->announce);
 
 	local = pubkey_eq(&pending->node_id_1, &rstate->local_id) ||
 		pubkey_eq(&pending->node_id_2, &rstate->local_id);
 
 	/* Did we have an update waiting?  If so, apply now. */
-	process_pending_channel_update(rstate, scid, pending->updates[0]);
-	process_pending_channel_update(rstate, scid, pending->updates[1]);
+	process_pending_channel_update(rstate, scid, pending->updates[0], pending->store);
+	process_pending_channel_update(rstate, scid, pending->updates[1], pending->store);
 
-	process_pending_node_announcement(rstate, &pending->node_id_1);
-	process_pending_node_announcement(rstate, &pending->node_id_2);
+	process_pending_node_announcement(rstate, &pending->node_id_1, pending->store);
+	process_pending_node_announcement(rstate, &pending->node_id_2, pending->store);
 
 	tal_free(pending);
 	return local;
@@ -884,7 +891,8 @@ void set_connection_values(struct chan *chan,
 	}
 }
 
-u8 *handle_channel_update(struct routing_state *rstate, const u8 *update)
+u8 *handle_channel_update(struct routing_state *rstate, const u8 *update,
+			  bool store)
 {
 	u8 *serialized;
 	struct half_chan *c;
@@ -984,7 +992,8 @@ u8 *handle_channel_update(struct routing_state *rstate, const u8 *update)
 			      timestamp,
 			      htlc_minimum_msat);
 
-	gossip_store_append(rstate->store, serialized);
+	if (store)
+		gossip_store_append(rstate->store, serialized);
 	replace_broadcast(chan, rstate->broadcasts,
 			  &chan->half[direction].channel_update_msgidx,
 			  take(serialized));
@@ -1026,7 +1035,8 @@ static struct wireaddr *read_addresses(const tal_t *ctx, const u8 *ser)
 	return wireaddrs;
 }
 
-u8 *handle_node_announcement(struct routing_state *rstate, const u8 *node_ann)
+u8 *handle_node_announcement(struct routing_state *rstate, const u8 *node_ann,
+			     bool store)
 {
 	u8 *serialized;
 	struct sha256_double hash;
@@ -1159,7 +1169,8 @@ u8 *handle_node_announcement(struct routing_state *rstate, const u8 *node_ann)
 	tal_free(node->alias);
 	node->alias = tal_dup_arr(node, u8, alias, 32, 0);
 
-	gossip_store_append(rstate->store, serialized);
+	if (store)
+		gossip_store_append(rstate->store, serialized);
 	replace_broadcast(node, rstate->broadcasts,
 			  &node->node_announce_msgidx,
 			  take(serialized));
@@ -1319,7 +1330,7 @@ void routing_failure(struct routing_state *rstate,
 				       (int) failcode);
 			return;
 		}
-		err = handle_channel_update(rstate, channel_update);
+		err = handle_channel_update(rstate, channel_update, true);
 		if (err) {
 			status_unusual("routing_failure: "
 				       "bad channel_update %s",

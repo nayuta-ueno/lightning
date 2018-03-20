@@ -36,7 +36,7 @@ struct gossip_store *gossip_store_new(const tal_t *ctx)
 void gossip_store_append(struct gossip_store *gs, const u8 *msg)
 {
 	u16 msglen = tal_len(msg);
-	beint16_t belen = CPU_TO_BE16(msglen);
+	beint16_t belen = cpu_to_be16(msglen);
 
 	/* FIXME: this method of detecting replayed messages is best effort
 	 * only. It should avoid doubling the store file size on every start,
@@ -59,7 +59,7 @@ const u8 *gossip_store_read_next(const tal_t *ctx, struct gossip_store *gs)
 	if (!read_all(gs->read_fd, &belen, sizeof(belen)))
 		return NULL;
 
-	msglen = BE16_TO_CPU(belen);
+	msglen = be16_to_cpu(belen);
 	msg = tal_arr(ctx, u8, msglen);
 
 	if (!read_all(gs->read_fd, msg, msglen))

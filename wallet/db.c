@@ -245,6 +245,13 @@ char *dbmigrations[] = {
     "ALTER TABLE payments ADD failchannel BLOB;", /* erring_channel */
     "ALTER TABLE payments ADD failupdate BLOB;", /* channel_update - can be NULL*/
     /* -- Payment routing failure information ends -- */
+    "CREATE TABLE onchaind_msgs ("
+    " id INTEGER,"
+    " funding_txid BLOB,"
+    " blockheight INTEGER,"
+    " message BLOB,"
+    " PRIMARY KEY(id)"
+    ");",
     NULL,
 };
 

@@ -1528,16 +1528,12 @@ static void setup_listeners(struct daemon *daemon, u16 portnum)
 static bool master_conn_idle(struct io_conn *conn UNUSED,
 			     struct daemon_conn *dc)
 {
-	const u8 *msg, *err;
+	const u8 *msg;
 	struct daemon *daemon = container_of(dc, struct daemon, master);
 	msg = gossip_store_read_next(tmpctx, daemon->rstate->store);
 
 	if (msg) {
-		err = handle_gossip_msg(daemon, msg);
-
-		/* Since we are replaying from store we should not get errors */
-		assert(!err);
-
+		handle_gossip_msg(daemon, msg);
 		return true;
 	} else {
 		return false;

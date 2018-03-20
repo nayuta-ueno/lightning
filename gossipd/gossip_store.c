@@ -9,7 +9,7 @@
 #define GOSSIP_STORE_FILENAME "gossip_store"
 
 struct gossip_store {
-	int fd;
+	int read_fd, write_fd;
 
 	/* What was the size of the gossip_store when we started replaying
 	 * it? */
@@ -18,7 +18,9 @@ struct gossip_store {
 
 static void gossip_store_destroy(struct gossip_store *gs)
 {
-	close(gs->fd);
+	if (gs->read_fd != -1)
+		close(gs->read_fd);
+	close(gs->write_fd);
 }
 
 struct gossip_store *gossip_store_new(const tal_t *ctx)

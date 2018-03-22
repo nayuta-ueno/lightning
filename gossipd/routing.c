@@ -596,6 +596,41 @@ static void destroy_pending_cannouncement(struct pending_cannouncement *pending,
 	list_del_from(&rstate->pending_cannouncement, &pending->list);
 }
 
+void routing_add_channel_announcement(struct routing_state *rstate,
+				      const u8 *msg TAKES, u64 satoshis)
+{
+	struct chan *chan;
+	secp256k1_ecdsa_signature node_signature_1, node_signature_2;
+	secp256k1_ecdsa_signature bitcoin_signature_1, bitcoin_signature_2;
+	u8 *features;
+	struct bitcoin_blkid chain_hash;
+	struct short_channel_id scid;
+	struct pubkey node_id_1;
+	struct pubkey node_id_2;
+	struct pubkey bitcoin_key_1;
+	struct pubkey bitcoin_key_2;
+	fromwire_channel_announcement(
+	    tmpctx, msg, &node_signature_1, &node_signature_2,
+	    &bitcoin_signature_1, &bitcoin_signature_2, &features, &chain_hash,
+	    &scid, &node_id_1, &node_id_2, &bitcoin_key_1, &bitcoin_key_2);
+	/* The channel may already exist if it was non-public from
+	 * local_add_channel(); normally we don't accept new
+	 * channel_announcements.  See handle_channel_announcement. */
+	chan = get_channel(rstate, &scid);
+	if (!chan)
+		chan = new_chan(rstate, &scid, &node_id_1, &node_id_2);
+
+	/* Channel is now public. */
+	chan->public = true;
+	chan->satoshis = satoshis;
+
+	if (replace_broadcast(chan, rstate->broadcasts,
+			      &chan->channel_announce_msgidx, take(msg)))
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "Announcement %s was replaced?",
+			      tal_hex(tmpctx, msg));
+}
+
 u8 *handle_channel_announcement(struct routing_state *rstate,
 				const u8 *announce TAKES,
 				const struct short_channel_id **scid,
@@ -759,7 +794,6 @@ bool handle_pending_cannouncement(struct routing_state *rstate,
 	bool local;
 	const u8 *s;
 	struct pending_cannouncement *pending;
-	struct chan *chan;
 
 	pending = find_pending_cannouncement(rstate, scid);
 	if (!pending)
@@ -799,25 +833,7 @@ bool handle_pending_cannouncement(struct routing_state *rstate,
 		return false;
 	}
 
-	/* The channel may already exist if it was non-public from
-	 * local_add_channel(); normally we don't accept new
-	 * channel_announcements.  See handle_channel_announcement. */
-	chan = get_channel(rstate, scid);
-	if (!chan)
-		chan = new_chan(rstate, scid,
-					   &pending->node_id_1,
-					   &pending->node_id_2);
-
-	/* Channel is now public. */
-	chan->public = true;
-	chan->satoshis = satoshis;
-
-	if (replace_broadcast(chan, rstate->broadcasts,
-			      &chan->channel_announce_msgidx,
-			      pending->announce))
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "Announcement %s was replaced?",
-			      tal_hex(tmpctx, pending->announce));
+	routing_add_channel_announcement(rstate, pending->announce, satoshis);
 
 	if (pending->store)
 		gossip_store_append(rstate->store, pending->announce);

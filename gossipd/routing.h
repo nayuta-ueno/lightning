@@ -261,4 +261,14 @@ void route_prune(struct routing_state *rstate);
  * the direction bit the matching channel should get */
 #define get_channel_direction(from, to) (pubkey_cmp(from, to) > 0)
 
+/*
+ * Add a channel_announcement to the network view without checking it
+ *
+ * Directly add the channel to the local network, without checking it first. Use
+ * this only for messages from trusted sources. Untrusted sources should use the
+ * @see{handle_channel_announcement} entrypoint to check before adding.
+ */
+void routing_add_channel_announcement(struct routing_state *rstate,
+				      const u8 *msg TAKES, u64 satoshis);
+
 #endif /* LIGHTNING_LIGHTNINGD_GOSSIP_ROUTING_H */

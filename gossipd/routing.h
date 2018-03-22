@@ -261,7 +261,7 @@ void route_prune(struct routing_state *rstate);
  * the direction bit the matching channel should get */
 #define get_channel_direction(from, to) (pubkey_cmp(from, to) > 0)
 
-/*
+/**
  * Add a channel_announcement to the network view without checking it
  *
  * Directly add the channel to the local network, without checking it first. Use
@@ -270,5 +270,26 @@ void route_prune(struct routing_state *rstate);
  */
 void routing_add_channel_announcement(struct routing_state *rstate,
 				      const u8 *msg TAKES, u64 satoshis);
+
+/**
+ * Add a channel_update without checking for errors
+ *
+ * Used to actually insert the information in the channel update into the local
+ * network view. Only use this for messages that are known to be good. For
+ * untrusted source, requiring verification please use
+ * @see{handle_channel_update}
+ */
+void routing_add_channel_update(struct routing_state *rstate,
+				const u8 *update TAKES);
+
+/**
+ * Add a node_announcement to the network view without checking it
+ *
+ * Directly add the node being announced to the network view, without verifying
+ * it. This must be from a trusted source, e.g., gossip_store. For untrusted
+ * sources (peers) please use @see{handle_node_announcement}.
+ */
+void routing_add_node_announcement(struct routing_state *rstate,
+                                  const u8 *msg TAKES);
 
 #endif /* LIGHTNING_LIGHTNINGD_GOSSIP_ROUTING_H */

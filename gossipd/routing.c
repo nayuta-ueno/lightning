@@ -1031,7 +1031,7 @@ u8 *handle_channel_update(struct routing_state *rstate, const u8 *update,
 		     flags & ROUTING_FLAGS_DISABLED ? "DISABLED" : "ACTIVE");
 
 	if (store)
-		gossip_store_append(rstate->store, serialized);
+		gossip_store_add_channel_update(rstate->store, serialized);
 	routing_add_channel_update(rstate, serialized);
 	return NULL;
 }

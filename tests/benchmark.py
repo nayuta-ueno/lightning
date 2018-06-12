@@ -8,7 +8,7 @@ from test_lightningd import NodeFactory
 from time import time
 from tqdm import tqdm
 
-num_workers = 480
+num_workers = 100
 num_payments = 10000
 
 
@@ -45,7 +45,8 @@ def node_factory(request, bitcoind, executor):
     nf.killall([False] * len(nf.nodes))
 
 
-def test_single_hop(node_factory, executor):
+@pytest.mark.parametrize("num_workers", range(40, 481, 40))
+def test_single_hop(node_factory, executor, num_workers):
     l1 = node_factory.get_node()
     l2 = node_factory.get_node()
 

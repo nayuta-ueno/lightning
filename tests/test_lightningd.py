@@ -31,7 +31,7 @@ with open('config.vars') as configfile:
 
 bitcoind = None
 TMPDIR = os.getenv("TMPDIR", '/tmp/')
-TEST_DIR = tempfile.mkdtemp(prefix='lightning-', dir=TEMP_DIR)
+TEST_DIR = tempfile.mkdtemp(prefix='lightning-', dir=TMPDIR)
 VALGRIND = os.getenv("VALGRIND", config['VALGRIND']) == "1"
 DEVELOPER = os.getenv("DEVELOPER", config['DEVELOPER']) == "1"
 TEST_DEBUG = os.getenv("TEST_DEBUG", "0") == "1"

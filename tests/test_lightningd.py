@@ -30,7 +30,8 @@ with open('config.vars') as configfile:
     config = dict([(line.rstrip().split('=', 1)) for line in configfile])
 
 bitcoind = None
-TEST_DIR = tempfile.mkdtemp(prefix='lightning-')
+TMPDIR = os.getenv("TMPDIR", '/tmp/')
+TEST_DIR = tempfile.mkdtemp(prefix='lightning-', dir=TEMP_DIR)
 VALGRIND = os.getenv("VALGRIND", config['VALGRIND']) == "1"
 DEVELOPER = os.getenv("DEVELOPER", config['DEVELOPER']) == "1"
 TEST_DEBUG = os.getenv("TEST_DEBUG", "0") == "1"

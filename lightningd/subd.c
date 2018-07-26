@@ -558,7 +558,7 @@ static void destroy_subd(struct subd *sd)
 			db_begin_transaction(db);
 		if (sd->errcb)
 			sd->errcb(channel, -1, -1, NULL, NULL,
-				  tal_fmt(sd, "Owning subdaemon %s died (%i)",
+				  tal_fmt(sd, "Owning subdaemon %s exited (%i)",
 					  sd->name, status),
 				  NULL);
 		if (!outer_transaction)

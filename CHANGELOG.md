@@ -34,6 +34,8 @@ changes.
 - JSON RPC: `getinfo` now shows correct Tor port.
 - JSON RPC: `ping` now works even after one peer fails to respond.
 - JSON RPC: `getroute` `fuzzpercent` and `pay` `maxfeepercent` can now be > 100.
+- JSON RPC: `withdraw all` says `Cannot afford transaction` if you have
+             absolutely no funds, rather than `Output 0 satoshis would be dust`.
 - Protocol: fix occasional deadlock when both peers flood with gossip.
 
 ### Security

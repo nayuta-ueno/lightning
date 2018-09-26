@@ -33,7 +33,6 @@ LIGHTNINGD_COMMON_OBJS :=			\
 	common/htlc_wire.o			\
 	common/key_derive.o			\
 	common/json.o				\
-	common/json_escaped.o			\
 	common/memleak.o			\
 	common/msg_queue.o			\
 	common/permute_tx.o			\
@@ -64,6 +63,7 @@ LIGHTNINGD_SRC :=				\
 	lightningd/htlc_end.c			\
 	lightningd/invoice.c			\
 	lightningd/json.c			\
+	lightningd/json_escaped.c		\
 	lightningd/jsonrpc.c			\
 	lightningd/lightningd.c			\
 	lightningd/log.c			\

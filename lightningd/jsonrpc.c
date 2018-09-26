@@ -508,7 +508,24 @@ static struct io_plan *write_json_done(struct io_conn *conn,
 		return io_close(conn);
 	}
 
-	/* Wake reader. */
+	/* If we have output pending, apply and write now. */
+	if (tal_count(jcon->out_overflow)) {
+		for (size_t i = 0; i < tal_count(jcon->out_overflow); i++) {
+			/* Don't copy NUL terminator */
+			size_t len = tal_count(jcon->out_overflow[i]) - 1;
+			char *p = membuf_add(&jcon->outbuf, len);
+			memcpy(p, jcon->out_overflow[i], len);
+		}
+		/* Free those pending strings. */
+		jcon->out_overflow = tal_free(jcon->out_overflow);
+		jcon->out_overflow = tal_arr(jcon, char *, 0);
+	}
+
+	/* If we have more to write, do it now. */
+	if (membuf_num_elems(&jcon->outbuf))
+		return write_json_done(conn, jcon);
+
+	/* Wake reader (FIXME: iff command done!) */
 	io_wake(conn);
 
 	/* Wait for command to wake us. */
@@ -593,6 +610,7 @@ static struct io_plan *jcon_connected(struct io_conn *conn,
 		    tal_arr(jcon, char, 64), 64, membuf_tal_realloc);
 	jcon->len_read = 0;
 	jcon->out_amount = 0;
+	jcon->out_overflow = tal_arr(jcon, char *, 0);
 
 	/* We want to log on destruction, so we free this in destructor. */
 	jcon->log = new_log(ld->log_book, ld->log_book, "%sjcon fd %i:",

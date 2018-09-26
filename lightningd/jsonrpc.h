@@ -66,6 +66,9 @@ struct json_connection {
 
 	/* How much we're writing right now. */
 	size_t out_amount;
+
+	/* Overflow, if outbuf busy. */
+	char **out_overflow;
 };
 
 struct json_command {

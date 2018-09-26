@@ -31,6 +31,16 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
+/* Realloc helper for tal membufs */
+static void *membuf_tal_realloc(struct membuf *mb,
+				void *rawelems, size_t newsize)
+{
+	char *p = rawelems;
+
+	tal_resize(&p, newsize);
+	return p;
+}
+
 /* jcon and cmd have separate lifetimes: we detach them on either destruction */
 static void destroy_jcon(struct json_connection *jcon)
 {
@@ -260,7 +270,11 @@ static void json_done(struct json_connection *jcon,
 		      const char *json TAKES)
 {
 	/* Queue for writing, and wake writer. */
-	jcon->outbuf = tal_strdup(jcon, json);
+	size_t len = strlen(json);
+	char *p = membuf_add(&jcon->outbuf, len);
+	memcpy(p, json, len);
+	if (taken(json))
+		tal_free(json);
 	io_wake(jcon);
 
 	assert(jcon->command == cmd);
@@ -485,7 +499,7 @@ static struct io_plan *write_json(struct io_conn *conn,
 static struct io_plan *write_json_done(struct io_conn *conn,
 				       struct json_connection *jcon)
 {
-	jcon->outbuf = tal_free(jcon->outbuf);
+	membuf_consume(&jcon->outbuf, jcon->out_amount);
 
 	if (jcon->stop) {
 		log_unusual(jcon->log, "JSON-RPC shutdown");
@@ -504,8 +518,9 @@ static struct io_plan *write_json_done(struct io_conn *conn,
 static struct io_plan *write_json(struct io_conn *conn,
 				  struct json_connection *jcon)
 {
+	jcon->out_amount = membuf_num_elems(&jcon->outbuf);
 	return io_write(conn,
-			jcon->outbuf, strlen(jcon->outbuf),
+			membuf_elems(&jcon->outbuf), jcon->out_amount,
 			write_json_done, jcon);
 }
 
@@ -574,8 +589,10 @@ static struct io_plan *jcon_connected(struct io_conn *conn,
 	jcon->used = 0;
 	jcon->buffer = tal_arr(jcon, char, 64);
 	jcon->stop = false;
-	jcon->outbuf = NULL;
+	membuf_init(&jcon->outbuf,
+		    tal_arr(jcon, char, 64), 64, membuf_tal_realloc);
 	jcon->len_read = 0;
+	jcon->out_amount = 0;
 
 	/* We want to log on destruction, so we free this in destructor. */
 	jcon->log = new_log(ld->log_book, ld->log_book, "%sjcon fd %i:",

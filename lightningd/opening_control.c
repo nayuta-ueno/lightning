@@ -98,7 +98,7 @@ void kill_uncommitted_channel(struct uncommitted_channel *uc,
 	tal_free(uc);
 }
 
-void json_add_uncommitted_channel(struct json_result *response,
+void json_add_uncommitted_channel(struct json_stream *response,
 				  const struct uncommitted_channel *uc)
 {
 	u64 msatoshi_total, our_msatoshi;
@@ -235,7 +235,7 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 	u32 feerate;
 	u64 change_satoshi;
 	struct channel *channel;
-	struct json_result *response;
+	struct json_stream *response;
 	struct lightningd *ld = openingd->ld;
 	struct channel_id cid;
 

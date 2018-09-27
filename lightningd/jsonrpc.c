@@ -276,11 +276,14 @@ void jcon_append(struct json_connection *jcon, const char *str)
 {
 	size_t len = strlen(str);
 
-	if (tal_count(jcon->out_overflow)
-	    || !json_connection_membuf_ok(jcon, len)) {
-		/* Unusual case: make a copy for later. */
+	if (!json_connection_membuf_ok(jcon, len)) {
+		if (!jcon->out_overflow)
+			jcon->out_overflow = tal_arr(jcon, char *, 0);
+	}
+
+	if (jcon->out_overflow)
 		*tal_arr_expand(&jcon->out_overflow) = tal_strdup(jcon, str);
-	} else
+	else
 		memcpy(membuf_add(&jcon->outbuf, len), str, len);
 
 	/* Wake writer. */
@@ -297,7 +300,7 @@ void jcon_append_vfmt(struct json_connection *jcon, const char *fmt, va_list ap)
 
 	/* If we've started on overflow, we need to keep appending to maintain
 	 * order. */
-	if (tal_count(jcon->out_overflow))
+	if (jcon->out_overflow)
 		goto overflow;
 
 	/* Try printing in place first. */
@@ -317,6 +320,8 @@ void jcon_append_vfmt(struct json_connection *jcon, const char *fmt, va_list ap)
 	} else {
 		char *str;
 		/* Can't enlarge if they're writing now: make copy for later */
+		if (!jcon->out_overflow)
+			jcon->out_overflow = tal_arr(jcon, char *, 0);
 	overflow:
 		str = tal_vfmt(jcon->out_overflow, fmt, ap2);
 		*tal_arr_expand(&jcon->out_overflow) = str;
@@ -515,7 +520,7 @@ static struct io_plan *write_json_done(struct io_conn *conn,
 	}
 
 	/* If we have output pending, apply it now. */
-	if (tal_count(jcon->out_overflow)) {
+	if (jcon->out_overflow) {
 		for (size_t i = 0; i < tal_count(jcon->out_overflow); i++) {
 			/* Don't copy NUL terminator */
 			size_t len = tal_count(jcon->out_overflow[i]) - 1;
@@ -524,7 +529,7 @@ static struct io_plan *write_json_done(struct io_conn *conn,
 		}
 		/* Free those pending strings. */
 		jcon->out_overflow = tal_free(jcon->out_overflow);
-		jcon->out_overflow = tal_arr(jcon, char *, 0);
+
 	}
 
 	/* If we have more to write, do it now. */
@@ -618,7 +623,7 @@ static struct io_plan *jcon_connected(struct io_conn *conn,
 		    tal_arr(jcon, char, 64), 64, membuf_tal_realloc);
 	jcon->len_read = 0;
 	jcon->out_amount = 0;
-	jcon->out_overflow = tal_arr(jcon, char *, 0);
+	jcon->out_overflow = NULL;
 	jcon->command = NULL;
 
 	/* We want to log on destruction, so we free this in destructor. */

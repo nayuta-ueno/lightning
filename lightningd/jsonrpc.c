@@ -272,72 +272,60 @@ static const struct json_command *find_cmd(const char *buffer,
 	return NULL;
 }
 
-static void json_done(struct json_connection *jcon,
-		      struct command *cmd,
-		      const char *json TAKES)
+void jcon_append(struct json_connection *jcon, const char *str)
 {
-	/* Queue for writing, and wake writer. */
-	size_t len = strlen(json);
-	char *p = membuf_add(&jcon->outbuf, len);
-	memcpy(p, json, len);
-	if (taken(json))
-		tal_free(json);
+	size_t len = strlen(str);
+
+	if (tal_count(jcon->out_overflow)
+	    || !json_connection_membuf_ok(jcon, len)) {
+		/* Unusual case: make a copy for later. */
+		*tal_arr_expand(&jcon->out_overflow) = tal_strdup(jcon, str);
+	} else
+		memcpy(membuf_add(&jcon->outbuf, len), str, len);
+
+	/* Wake writer. */
 	io_wake(jcon);
-
-	assert(jcon->command == cmd);
-	jcon->command = tal_free(cmd);
 }
 
-static void connection_complete_ok(struct json_connection *jcon,
-				   struct command *cmd,
-				   const char *id,
-				   const struct json_result *result)
+void jcon_append_vfmt(struct json_connection *jcon, const char *fmt, va_list ap)
 {
-	assert(id != NULL);
-	assert(result != NULL);
-	if (cmd->ok)
-		*(cmd->ok) = true;
+	size_t fmtlen;
+	va_list ap2;
 
-	/* This JSON is simple enough that we build manually */
-	json_done(jcon, cmd, take(tal_fmt(jcon,
-					  "{ \"jsonrpc\": \"2.0\", "
-					  "\"result\" : %s,"
-					  " \"id\" : %s }\n",
-					  json_result_string(result), id)));
-}
+	/* Make a copy in case we need it below. */
+	va_copy(ap2, ap);
 
-static void connection_complete_error(struct json_connection *jcon,
-				      struct command *cmd,
-				      const char *id,
-				      const char *errmsg,
-				      int code,
-				      const struct json_result *data)
-{
-	struct json_escaped *esc;
-	const char *data_str;
+	/* If we've started on overflow, we need to keep appending to maintain
+	 * order. */
+	if (tal_count(jcon->out_overflow))
+		goto overflow;
 
-	esc = json_escape(tmpctx, errmsg);
-	if (data)
-		data_str = tal_fmt(tmpctx, ", \"data\" : %s",
-				   json_result_string(data));
-	else
-		data_str = "";
+	/* Try printing in place first. */
+	fmtlen = vsnprintf(membuf_space(&jcon->outbuf),
+			   membuf_num_space(&jcon->outbuf), fmt, ap);
 
-	assert(id != NULL);
+	/* Horrible subtlety: vsnprintf *will* NUL terminate, even if it means
+	 * chopping off the last character.  So if fmtlen ==
+	 * membuf_num_space(&jcon->outbuf), the result was truncated! */
+	if (fmtlen < membuf_num_space(&jcon->outbuf)) {
+		membuf_added(&jcon->outbuf, fmtlen);
+	} else if (!json_connection_busy(jcon)) {
+		/* Make room for NUL terminator, even though we don't want it */
+		membuf_prepare_space(&jcon->outbuf, fmtlen+1);
+		vsprintf(membuf_space(&jcon->outbuf), fmt, ap2);
+		membuf_added(&jcon->outbuf, fmtlen);
+	} else {
+		char *str;
+		/* Can't enlarge if they're writing now: make copy for later */
+	overflow:
+		str = tal_vfmt(jcon->out_overflow, fmt, ap2);
+		*tal_arr_expand(&jcon->out_overflow) = str;
+	}
 
-	if (cmd->ok)
-		*(cmd->ok) = false;
+	va_end(ap2);
 
-	json_done(jcon, cmd, take(tal_fmt(tmpctx,
-					  "{ \"jsonrpc\": \"2.0\", "
-					  " \"error\" : "
-					  "{ \"code\" : %d,"
-					  " \"message\" : \"%s\"%s },"
-					  " \"id\" : %s }\n",
-					  code,
-					  esc->s,
-					  data_str,
-					  id)));
+	/* Wake writer. */
+	io_wake(jcon);
 }
 
 struct json_result *null_response(struct command *cmd)
@@ -350,57 +338,55 @@ struct json_result *null_response(struct command *cmd)
 	return response;
 }
 
-void command_success(struct command *cmd, struct json_result *result)
+/* This can be called directly on shutdown, even with unfinished cmd */
+static void destroy_command(struct command *cmd)
 {
-	struct json_connection *jcon = cmd->jcon;
-
-	if (!jcon) {
+	if (!cmd->jcon) {
 		log_debug(cmd->ld->log,
 			    "Command returned result after jcon close");
-		tal_free(cmd);
 		return;
 	}
-	assert(jcon->command == cmd);
-	connection_complete_ok(jcon, cmd, cmd->id, result);
+
+	assert(cmd->jcon->command == cmd);
+	cmd->jcon->command = NULL;
 }
 
-static void command_fail_generic(struct command *cmd,
-				 int code,
-				 const struct json_result *data,
-				 const char *error)
+/* FIXME: Remove result arg here! */
+void command_success(struct command *cmd, struct json_result *result)
 {
-	struct json_connection *jcon = cmd->jcon;
-
-	if (!jcon) {
-		log_debug(cmd->ld->log,
-			  "%s: Command failed after jcon close",
-			  cmd->json_cmd->name);
-		tal_free(cmd);
-		return;
-	}
-
-	/* cmd->json_cmd can be NULL, if we're failing for command not found! */
-	log_debug(jcon->log, "Failing %s: %s",
-		  cmd->json_cmd ? cmd->json_cmd->name : "invalid cmd",
-		  error);
-
-	assert(jcon->command == cmd);
-	connection_complete_error(jcon, cmd, cmd->id, error, code, data);
+	assert(cmd->have_json_stream);
+	if (cmd->jcon)
+		jcon_append(cmd->jcon, " }\n");
+	if (cmd->ok)
+		*(cmd->ok) = true;
+	tal_free(cmd);
 }
 
+/* FIXME: Remove result arg here! */
 void command_failed(struct command *cmd, struct json_result *result)
 {
-	assert(cmd->failcode != 0);
-	command_fail_generic(cmd, cmd->failcode, result, cmd->errmsg);
+	assert(cmd->have_json_stream);
+	/* Have to close error */
+	if (cmd->jcon)
+		jcon_append(cmd->jcon, " } }\n");
+	if (cmd->ok)
+		*(cmd->ok) = false;
+	tal_free(cmd);
 }
 
 void PRINTF_FMT(3, 4) command_fail(struct command *cmd, int code,
 				   const char *fmt, ...)
 {
+	const char *errmsg;
+	struct json_result *r;
 	va_list ap;
+
 	va_start(ap, fmt);
-	command_fail_generic(cmd, code, NULL, tal_vfmt(cmd, fmt, ap));
+	errmsg = tal_vfmt(cmd, fmt, ap);
 	va_end(ap);
+	r = json_stream_fail_nodata(cmd, code, errmsg);
+
+	command_failed(cmd, r);
 }
 
 void command_still_pending(struct command *cmd)
@@ -410,12 +396,23 @@ void command_still_pending(struct command *cmd)
 	cmd->pending = true;
 }
 
+static void jcon_start(struct json_connection *jcon, const char *id)
+{
+	jcon_append(jcon, "{ \"jsonrpc\": \"2.0\", \"id\" : ");
+	jcon_append(jcon, id);
+	jcon_append(jcon, ", ");
+}
+
 static void json_command_malformed(struct json_connection *jcon,
 				   const char *id,
 				   const char *error)
 {
-	return connection_complete_error(jcon, NULL, id, error,
-					 JSONRPC2_INVALID_REQUEST, NULL);
+	jcon_start(jcon, id);
+	jcon_append(jcon,
+		    tal_fmt(tmpctx, " \"error\" : "
+			    "{ \"code\" : %d,"
+			    " \"message\" : \"%s\" } }\n",
+			    JSONRPC2_INVALID_REQUEST, error));
 }
 
 static void parse_request(struct json_connection *jcon, const jsmntok_t tok[])
@@ -456,6 +453,10 @@ static void parse_request(struct json_connection *jcon, const jsmntok_t tok[])
 	c->mode = CMD_NORMAL;
 	c->ok = NULL;
 	jcon->command = c;
+	tal_add_destructor(c, destroy_command);
+
+	/* Write start of response: rest will be appended directly. */
+	jcon_start(jcon, c->id);
 
 	if (!method || !params) {
 		command_fail(c, JSONRPC2_INVALID_REQUEST,
@@ -503,6 +504,9 @@ static struct io_plan *write_json_done(struct io_conn *conn,
 {
 	membuf_consume(&jcon->outbuf, jcon->out_amount);
 
+	/* This doubles as a flag to say we're busy writing out, so reset */
+	jcon->out_amount = 0;
+
 	if (jcon->stop) {
 		log_unusual(jcon->log, "JSON-RPC shutdown");
 		/* Return us to toplevel lightningd.c */
@@ -510,7 +514,7 @@ static struct io_plan *write_json_done(struct io_conn *conn,
 		return io_close(conn);
 	}
 
-	/* If we have output pending, apply and write now. */
+	/* If we have output pending, apply it now. */
 	if (tal_count(jcon->out_overflow)) {
 		for (size_t i = 0; i < tal_count(jcon->out_overflow); i++) {
 			/* Don't copy NUL terminator */
@@ -525,10 +529,12 @@ static struct io_plan *write_json_done(struct io_conn *conn,
 
 	/* If we have more to write, do it now. */
 	if (membuf_num_elems(&jcon->outbuf))
-		return write_json_done(conn, jcon);
+		return write_json(conn, jcon);
 
-	/* Wake reader (FIXME: iff command done!) */
-	io_wake(conn);
+	/* If command is done and we've output everything, wake read_json
+	 * for next command. */
+	if (!jcon->command)
+		io_wake(conn);
 
 	/* Wait for command to wake us. */
 	return io_out_wait(conn, jcon, write_json, jcon);
@@ -613,6 +619,7 @@ static struct io_plan *jcon_connected(struct io_conn *conn,
 	jcon->len_read = 0;
 	jcon->out_amount = 0;
 	jcon->out_overflow = tal_arr(jcon, char *, 0);
+	jcon->command = NULL;
 
 	/* We want to log on destruction, so we free this in destructor. */
 	jcon->log = new_log(ld->log_book, ld->log_book, "%sjcon fd %i:",

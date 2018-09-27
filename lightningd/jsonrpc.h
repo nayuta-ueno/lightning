@@ -6,6 +6,7 @@
 #include <ccan/list/list.h>
 #include <ccan/membuf/membuf.h>
 #include <common/json.h>
+#include <stdarg.h>
 
 struct bitcoin_txid;
 struct wireaddr;
@@ -39,10 +40,6 @@ struct command {
 	bool *ok;
 	/* Have we started a json stream already?  For debugging. */
 	bool have_json_stream;
-
-	/* FIXME: Temporary. */
-	int failcode;
-	const char *errmsg;
 };
 
 struct json_connection {
@@ -77,6 +74,20 @@ struct json_connection {
 	char **out_overflow;
 };
 
+/* We can't resize the membuf while it's being written out. */
+static inline bool json_connection_busy(const struct json_connection *jcon)
+{
+	return jcon->out_amount != 0;
+}
+
+/* We can't resize the membuf while it's being written out. */
+static inline bool json_connection_membuf_ok(const struct json_connection *jcon,
+					     size_t len)
+{
+	return !json_connection_busy(jcon)
+		|| membuf_num_space(&jcon->outbuf) >= len;
+}
+
 struct json_command {
 	const char *name;
 	void (*dispatch)(struct command *,
@@ -95,6 +106,9 @@ void PRINTF_FMT(3, 4) command_fail(struct command *cmd, int code,
 /* Mainly for documentation, that we plan to close this later. */
 void command_still_pending(struct command *cmd);
 
+/* Low level jcon routines. */
+void jcon_append(struct json_connection *jcon, const char *str);
+void jcon_append_vfmt(struct json_connection *jcon, const char *fmt, va_list ap);
 
 /* For initialization */
 void setup_jsonrpc(struct lightningd *ld, const char *rpc_filename);

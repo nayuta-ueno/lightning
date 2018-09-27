@@ -10,8 +10,9 @@ struct peer_features {
 };
 
 struct gossip_getnodes_entry {
-	struct pubkey nodeid;
-	u8 *globalfeatures;
+	/* This is raw to optimize marshaling: be careful! */
+	u8 nodeid[sizeof(struct pubkey)];
+	u8 *global_features;
 	s64 last_timestamp; /* -1 means never: following fields ignored */
 	struct wireaddr *addresses;
 	u8 *alias;
@@ -19,7 +20,8 @@ struct gossip_getnodes_entry {
 };
 
 struct gossip_getchannels_entry {
-	struct pubkey source, destination;
+	/* These are raw to optimize marshaling: be careful! */
+	u8 source[sizeof(struct pubkey)], destination[sizeof(struct pubkey)];
 	u64 satoshis;
 	struct short_channel_id short_channel_id;
 	u8 message_flags;

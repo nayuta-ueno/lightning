@@ -1328,6 +1328,11 @@ static struct io_plan *getroute_req(struct io_conn *conn, struct daemon *daemon,
 	return daemon_conn_read_next(conn, &daemon->master);
 }
 
+#define raw_pubkey(arr, id)				\
+	do { BUILD_ASSERT(sizeof(arr) == sizeof(*id));	\
+		memcpy(arr, id, sizeof(*id));		\
+	} while(0)
+
 static void append_half_channel(struct gossip_getchannels_entry **entries,
 				const struct chan *chan,
 				int idx)
@@ -1340,8 +1345,8 @@ static void append_half_channel(struct gossip_getchannels_entry **entries,
 
 	e = tal_arr_expand(entries);
 
-	e->source = chan->nodes[idx]->id;
-	e->destination = chan->nodes[!idx]->id;
+	raw_pubkey(e->source, &chan->nodes[idx]->id);
+	raw_pubkey(e->destination, &chan->nodes[!idx]->id);
 	e->satoshis = chan->satoshis;
 	e->channel_flags = c->channel_flags;
 	e->message_flags = c->message_flags;
@@ -1400,9 +1405,9 @@ static void append_node(const struct gossip_getnodes_entry ***nodes,
 	struct gossip_getnodes_entry *new;
 
 	new = tal(*nodes, struct gossip_getnodes_entry);
-	new->nodeid = *nodeid;
-	new->globalfeatures = tal_dup_arr(*nodes, u8, globalfeatures,
-					  tal_count(globalfeatures), 0);
+	raw_pubkey(new->nodeid, nodeid);
+	new->global_features = tal_dup_arr(*nodes, u8, gfeatures,
+					   tal_count(gfeatures), 0);
 	if (!n || n->last_timestamp < 0) {
 		new->last_timestamp = -1;
 		new->addresses = NULL;

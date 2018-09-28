@@ -1430,12 +1430,12 @@ static struct io_plan *getnodes(struct io_conn *conn, struct daemon *daemon,
 	if (id) {
 		n = get_node(daemon->rstate, id);
 		if (n)
-			append_node(&nodes, id, n->gfeatures, n);
+			append_node(&nodes, id, n->globalfeatures, n);
 	} else {
 		struct node_map_iter i;
 		n = node_map_first(daemon->rstate->nodes, &i);
 		while (n != NULL) {
-			append_node(&nodes, &n->id, n->gfeatures, n);
+			append_node(&nodes, &n->id, n->globalfeatures, n);
 			n = node_map_next(daemon->rstate->nodes, &i);
 		}
 	}

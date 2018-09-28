@@ -1,3 +1,4 @@
+#include <ccan/array_size/array_size.h>
 #include <ccan/asort/asort.h>
 #include <ccan/build_assert/build_assert.h>
 #include <ccan/cast/cast.h>
@@ -1392,28 +1393,24 @@ static struct io_plan *getchannels_req(struct io_conn *conn, struct daemon *daem
 	return daemon_conn_read_next(conn, &daemon->master);
 }
 
-static void append_node(const struct gossip_getnodes_entry ***nodes,
-			const struct pubkey *nodeid,
-			const u8 *globalfeatures,
-			/* If non-NULL, contains more information */
+/* We keep pointers into n, assuming it won't change! */
+static void append_node(const struct gossip_getnodes_entry ***entries,
 			const struct node *n)
 {
-	struct gossip_getnodes_entry *new;
+	struct gossip_getnodes_entry *e;
 
-	new = tal(*nodes, struct gossip_getnodes_entry);
-	new->nodeid = *nodeid;
-	new->globalfeatures = tal_dup_arr(*nodes, u8, globalfeatures,
-					  tal_count(globalfeatures), 0);
-	if (!n || n->last_timestamp < 0) {
-		new->last_timestamp = -1;
-		new->addresses = NULL;
-	} else {
-		new->last_timestamp = n->last_timestamp;
-		new->addresses = n->addresses;
-		new->alias = n->alias;
-		memcpy(new->color, n->rgb_color, 3);
-	}
-	*tal_arr_expand(nodes) = new;
+	*tal_arr_expand(entries) = e
+		= tal(*entries, struct gossip_getnodes_entry);
+	e->nodeid = n->id;
+	e->last_timestamp = n->last_timestamp;
+	if (e->last_timestamp < 0)
+		return;
+
+	e->globalfeatures = n->globalfeatures;
+	e->addresses = n->addresses;
+	e->alias = n->alias;
+	BUILD_ASSERT(ARRAY_SIZE(e->color) == ARRAY_SIZE(n->rgb_color));
+	memcpy(e->color, n->rgb_color, ARRAY_SIZE(e->color));
 }
 
 static struct io_plan *getnodes(struct io_conn *conn, struct daemon *daemon,
@@ -1430,12 +1427,12 @@ static struct io_plan *getnodes(struct io_conn *conn, struct daemon *daemon,
 	if (id) {
 		n = get_node(daemon->rstate, id);
 		if (n)
-			append_node(&nodes, id, n->globalfeatures, n);
+			append_node(&nodes, n);
 	} else {
 		struct node_map_iter i;
 		n = node_map_first(daemon->rstate->nodes, &i);
 		while (n != NULL) {
-			append_node(&nodes, &n->id, n->globalfeatures, n);
+			append_node(&nodes, n);
 			n = node_map_next(daemon->rstate->nodes, &i);
 		}
 	}

@@ -648,6 +648,61 @@ def test_multiplexed_rpc(node_factory):
         assert obj['id'] == l1.rpc.decoder.decode(i.decode("UTF-8"))['id']
     sock.close()
 
+
+def test_malformed_rpc(node_factory):
+    """Test that we get a correct response to malformed RPC commands"""
+    l1 = node_factory.get_node()
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(l1.rpc.socket_path)
+
+    commands = [
+        # No id.
+        # No method
+        b'{"id":1,"jsonrpc":"2.0","method":"getinfo","params":[]}',
+        b'{"id":1,"jsonrpc":"2.0","params":[2000]}',
+        # Bad ID
+        b'{"id":{2},"jsonrpc":"2.0","method":"dev-slowcmd","params":[1500]}',
+        b'{"id":2,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1500]}',
+        b'{"id":3,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1000]}',
+        b'{"id":3,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1000]}',
+        b'{"id":4,"jsonrpc":"2.0","method":"dev-slowcmd","params":[500]}',
+        b'{"id":4,"jsonrpc":"2.0","method":"dev-slowcmd","params":[500]}'
+    ]
+    # no ID
+    sock.sendall(b'{"jsonrpc":"2.0","method":"getinfo","params":[]}')
+
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # no method
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # complete crap
+    sock.sendall(b'[]')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # bad ID
+    sock.sendall(b'{"id":{}, "jsonrpc":"2.0","method":"getinfo","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # bad method
+    sock.sendall(b'{"id":1, "method": 12, "jsonrpc":"2.0","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # unknown method
+    sock.sendall(b'{"id":1, "method": "unknown", "jsonrpc":"2.0","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32601
+    
+    sock.close()
+
+
 def test_cli(node_factory):
     l1 = node_factory.get_node()
 

@@ -60,9 +60,10 @@ struct json_connection {
 	/* Our commands */
 	struct list_head commands;
 
-	/* Our json_streams (owned by the commands themselves while running).
-	 * Since multiple streams could start returning data at once, we 
-	 * always service these in order, freeing once empty. */
+	/* Our json_streams (owned by the commands themselves while
+	 * running). Since multiple streams could start returning data
+	 * at once, we always service these in order, freeing once
+	 * empty. */
 	struct json_stream **js_arr;
 };
 

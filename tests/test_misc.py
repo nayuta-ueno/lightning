@@ -656,50 +656,36 @@ def test_malformed_rpc(node_factory):
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(l1.rpc.socket_path)
 
-    commands = [
-        # No id.
-        # No method
-        b'{"id":1,"jsonrpc":"2.0","method":"getinfo","params":[]}',
-        b'{"id":1,"jsonrpc":"2.0","params":[2000]}',
-        # Bad ID
-        b'{"id":{2},"jsonrpc":"2.0","method":"dev-slowcmd","params":[1500]}',
-        b'{"id":2,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1500]}',
-        b'{"id":3,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1000]}',
-        b'{"id":3,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1000]}',
-        b'{"id":4,"jsonrpc":"2.0","method":"dev-slowcmd","params":[500]}',
-        b'{"id":4,"jsonrpc":"2.0","method":"dev-slowcmd","params":[500]}'
-    ]
-    # no ID
+    # No ID
     sock.sendall(b'{"jsonrpc":"2.0","method":"getinfo","params":[]}')
-
     obj, _ = l1.rpc._readobj(sock, b'')
     assert obj['error']['code'] == -32600
 
-    # no method
+    # No method
     sock.sendall(b'{"id":1, "jsonrpc":"2.0","params":[]}')
     obj, _ = l1.rpc._readobj(sock, b'')
     assert obj['error']['code'] == -32600
 
-    # complete crap
+    # Complete crap
     sock.sendall(b'[]')
     obj, _ = l1.rpc._readobj(sock, b'')
     assert obj['error']['code'] == -32600
 
-    # bad ID
+    # Bad ID
     sock.sendall(b'{"id":{}, "jsonrpc":"2.0","method":"getinfo","params":[]}')
     obj, _ = l1.rpc._readobj(sock, b'')
     assert obj['error']['code'] == -32600
 
-    # bad method
+    # Bad method
     sock.sendall(b'{"id":1, "method": 12, "jsonrpc":"2.0","params":[]}')
     obj, _ = l1.rpc._readobj(sock, b'')
     assert obj['error']['code'] == -32600
 
-    # unknown method
+    # Unknown method
     sock.sendall(b'{"id":1, "method": "unknown", "jsonrpc":"2.0","params":[]}')
     obj, _ = l1.rpc._readobj(sock, b'')
     assert obj['error']['code'] == -32601
-    
+
     sock.close()
 
 

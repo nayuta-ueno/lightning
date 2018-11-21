@@ -10,6 +10,7 @@
  *    reading and writing synchronously we could deadlock if we hit buffer
  *    limits, unlikely as that is.
  */
+#include <bitcoin/chainparams.h>
 #include <bitcoin/privkey.h>
 #include <bitcoin/script.h>
 #include <ccan/cast/cast.h>

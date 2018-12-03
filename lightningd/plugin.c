@@ -69,11 +69,6 @@ struct plugins {
 	struct jsonrpc *rpc;
 };
 
-struct json_output {
-	struct list_node list;
-	const char *json;
-};
-
 /* Represents a pending JSON-RPC request that was forwarded to a
  * plugin and is currently waiting for it to return the result. */
 struct plugin_rpc_request {

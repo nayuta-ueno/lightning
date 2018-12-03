@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `num_active_channels` and `num_inactive_channels` fields.
 - JSON API: use `\n\n` to terminate responses, for simplified parsing (pylightning now relies on this)
 - Plugins: Added plugins to `lightningd` and implemented the option passthrough.
+- Plugins: Implement the JSON-RPC call passthrough, unifying the JSON-RPC interface of `lightningd` and the plugins it manages.
 
 ### Changed
 

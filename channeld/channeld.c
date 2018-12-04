@@ -1662,7 +1662,7 @@ static void peer_in(struct peer *peer, const u8 *msg)
 	/* We might need to stash a channel update if we aren't ready
 	 * to process it just yet (because we haven't told gossipd
 	 * about it). */
-	if (type == WIRE_CHANNEL_UPDATE && !peer->channel_local_active) {
+	if (type == WIRE_CHANNEL_UPDATE && !peer->channel_local_active && !peer->stashed_channel_update) {
 		peer->stashed_channel_update = tal_dup_arr(peer, u8, msg, tal_bytelen(msg), 0);
 		return;
 	}

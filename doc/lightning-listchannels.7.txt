@@ -1,0 +1,65 @@
+LIGHTNING-LISTCHANNELS(7)
+=======================
+:doctype: manpage
+
+NAME
+----
+lightning-listchannels - Command for returning data on active lightning
+channels..
+
+SYNOPSIS
+--------
+*listchannels* ['short_channel_id']
+
+DESCRIPTION
+-----------
+The *listchannels* RPC command returns data on channels that are known to the
+node.
+
+If no 'short_channel_id' is supplied, then data on all lightning channels that
+are known to this node, are returned.
+
+Supplying 'short_channel_id' will filter the results to only return data on a
+channel with a matching 'short_channel_id', if one exists.
+
+RETURN VALUE
+------------
+On success, an object with a "channels" key is returned containing a list of 0
+or more objects.
+
+Each object in the list contains the following data:
+- 'source' - The node that initiated the channel creation
+- 'destination' - The node that was the target of the channel creation
+- 'short_channel_id' - The channel identifier
+- 'public' - Boolean value, is publicly available
+- 'satoshis' - 
+- 'message_flags' - 
+- 'channel_flags' - 
+- 'active' - 					
+- 'last_update' -
+- 'base_fee_millisatoshi' -
+- 'fee_per_millionth' -
+- 'delay' -
+
+If 'shcort_channel_id' is supplied and no matching channels are found, a
+"channels" object with an empty list is returned.
+
+ERRORS
+------
+If 'short_channel_id' is not a valid short_channel_id, an error message will be
+returned:
+
+	{ "code" : -32602, "message" : "'short_channel_id' should be a short
+	channel id, not '...'" }
+
+AUTHOR
+------
+Michael Hawkins <michael.hawkins@protonmail.com>.
+
+SEE ALSO
+--------
+lightning-fundchannel(7)
+
+RESOURCES
+---------
+Main web site: https://github.com/ElementsProject/lightning

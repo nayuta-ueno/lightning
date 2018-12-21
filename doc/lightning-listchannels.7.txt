@@ -5,7 +5,7 @@ LIGHTNING-LISTCHANNELS(7)
 NAME
 ----
 lightning-listchannels - Command for returning data on active lightning
-channels..
+channels.
 
 SYNOPSIS
 --------
@@ -28,20 +28,30 @@ On success, an object with a "channels" key is returned containing a list of 0
 or more objects.
 
 Each object in the list contains the following data:
-- 'source' - The node that initiated the channel creation
-- 'destination' - The node that was the target of the channel creation
-- 'short_channel_id' - The channel identifier
-- 'public' - Boolean value, is publicly available
-- 'satoshis' - 
-- 'message_flags' - 
-- 'channel_flags' - 
-- 'active' - 					
-- 'last_update' -
-- 'base_fee_millisatoshi' -
-- 'fee_per_millionth' -
-- 'delay' -
 
-If 'shcort_channel_id' is supplied and no matching channels are found, a
+- 'source' : The node that initiated the channel creation
+- 'destination' : The node that was the target of the channel creation
+- 'short_channel_id' : The channel identifier
+- 'public' : Boolean value, is publicly available
+- 'satoshis' : The amount of funds available in the channel
+- 'message_flags' : Bitfield showing the presence of optional fields in the
+'channel_update' message (BOLT #7)
+- 'channel_flags' : Bitfield showing the end of the channel the node is on
+(origin or final) and whether the channel has been disabled (BOLT #7)
+- 'active' : Boolean value, is available for routing.  This is linked to the
+channel flags data, where if the second bit is set to signal a channels
+temporary unavailability (due to loss of connectivity) OR permanent
+unavailability where the channel has been closed but not settlement on-chain.	
+- 'last_update' : Unix timestamp showing when the last channel_update message
+was received
+- 'base_fee_millisatoshi' : The base fee (in millisatoshi) charged for the
+HTLC. (BOLT #2)
+- 'fee_per_millionth' : The amount (in millionths of a satoshi) charged per
+transferred satoshi. (BOLT #2)
+- 'delay' : is the number of blocks delay required to wait for on-chain
+settlement when unilaterally closing the channel. (BOLT #2)
+
+If 'short_channel_id' is supplied and no matching channels are found, a
 "channels" object with an empty list is returned.
 
 ERRORS
@@ -49,8 +59,8 @@ ERRORS
 If 'short_channel_id' is not a valid short_channel_id, an error message will be
 returned:
 
-	{ "code" : -32602, "message" : "'short_channel_id' should be a short
-	channel id, not '...'" }
+{ "code" : -32602, "message" : "'short_channel_id' should be a short channel
+id, not '...'" }
 
 AUTHOR
 ------
@@ -63,3 +73,8 @@ lightning-fundchannel(7)
 RESOURCES
 ---------
 Main web site: https://github.com/ElementsProject/lightning
+
+Lightning RFC site
+
+- BOLT #2: https://github.com/lightningnetwork/lightning-rfc/blob/master/02-peer-protocol.md
+- BOLT #7: https://github.com/lightningnetwork/lightning-rfc/blob/master/07-routing-gossip.md

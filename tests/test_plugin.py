@@ -4,8 +4,10 @@ from lightning import RpcError
 
 import pytest
 import subprocess
+import unittest
 
 
+@unittest.skipIf(not EXPERIMENTAL_FEATURES, "plugin subsystem requires EXPERIMENTAL_FEATURES flag")
 def test_option_passthrough(node_factory):
     """ Ensure that registering options works.
 
@@ -32,6 +34,7 @@ def test_option_passthrough(node_factory):
     n.stop()
 
 
+@unittest.skipIf(not EXPERIMENTAL_FEATURES, "plugin subsystem requires EXPERIMENTAL_FEATURES flag")
 def test_rpc_passthrough(node_factory):
     """Starting with a plugin exposes its RPC methods.
 
@@ -58,12 +61,14 @@ def test_rpc_passthrough(node_factory):
         n.rpc.fail()
 
 
+@unittest.skipIf(not EXPERIMENTAL_FEATURES, "plugin subsystem requires EXPERIMENTAL_FEATURES flag")
 def test_plugin_dir(node_factory):
     """--plugin-dir works"""
     plugin_dir = 'contrib/plugins'
     node_factory.get_node(options={'plugin-dir': plugin_dir, 'greeting': 'Mars'})
 
 
+@unittest.skipIf(not EXPERIMENTAL_FEATURES, "plugin subsystem requires EXPERIMENTAL_FEATURES flag")
 def test_plugin_disable(node_factory):
     """--disable-plugin works"""
     plugin_dir = 'contrib/plugins'
@@ -83,6 +88,7 @@ def test_plugin_disable(node_factory):
         n.rpc.hello(name='Sun')
 
 
+@unittest.skipIf(not EXPERIMENTAL_FEATURES, "plugin subsystem requires EXPERIMENTAL_FEATURES flag")
 def test_plugin_notifications(node_factory):
     l1, l2 = node_factory.get_nodes(2, opts={'plugin': 'contrib/plugins/helloworld.py'})
 
@@ -95,6 +101,7 @@ def test_plugin_notifications(node_factory):
     l2.daemon.wait_for_log(r'Received disconnect event')
 
 
+@unittest.skipIf(not EXPERIMENTAL_FEATURES, "plugin subsystem requires EXPERIMENTAL_FEATURES flag")
 def test_failing_plugins():
     fail_plugins = [
         'contrib/plugins/fail/failtimeout.py',

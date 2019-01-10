@@ -16,7 +16,7 @@ with open('config.vars') as configfile:
 VALGRIND = os.getenv("VALGRIND", config['VALGRIND']) == "1"
 DEVELOPER = os.getenv("DEVELOPER", config['DEVELOPER']) == "1"
 TEST_DEBUG = os.getenv("TEST_DEBUG", "0") == "1"
-
+EXPERIMENTAL_FEATURES = config['EXPERIMENTAL_FEATURES']
 
 if TEST_DEBUG:
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)

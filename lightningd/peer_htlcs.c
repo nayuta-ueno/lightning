@@ -281,7 +281,7 @@ static void handle_localpay(struct htlc_in *hin,
 	}
 
 	if (!wallet_invoice_find_unpaid(ld->wallet, &invoice, payment_hash)) {
-		failcode = WIRE_UNKNOWN_PAYMENT_HASH;
+		failcode = WIRE_INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS;
 		goto fail;
 	}
 	details = wallet_invoice_details(tmpctx, ld->wallet, invoice);

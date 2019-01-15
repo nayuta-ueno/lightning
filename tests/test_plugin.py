@@ -174,7 +174,7 @@ def test_htlc_accepted_hook_fail(node_factory):
     """
     l1, l2, l3 = node_factory.line_graph(3, opts=[
         {},
-        {'plugin': 'contrib/plugins/fail_htlcs.py'},
+        {'plugin': 'tests/plugins/fail_htlcs.py'},
         {}
     ], wait_for_announce=True)
 
@@ -205,7 +205,7 @@ def test_htlc_accepted_hook_resolve(node_factory):
     """
     l1, l2, l3 = node_factory.line_graph(3, opts=[
         {},
-        {'plugin': 'contrib/plugins/shortcircuit.py'},
+        {'plugin': 'tests/plugins/shortcircuit.py'},
         {}
     ], wait_for_announce=True)
 

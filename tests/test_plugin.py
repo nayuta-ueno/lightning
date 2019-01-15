@@ -5,7 +5,6 @@ from lightning import RpcError
 import pytest
 import subprocess
 import time
-import unittest
 
 
 def test_option_passthrough(node_factory):

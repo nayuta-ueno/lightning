@@ -47,6 +47,8 @@ def test_rpc_passthrough(node_factory):
     cmd = [hlp for hlp in n.rpc.help()['help'] if 'hello' in hlp['command']]
     assert(len(cmd) == 1)
 
+    # Make sure usage message is present.
+    assert only_one(n.rpc.help('hello')['help'])['command'] == 'hello greeting'
     # While we're at it, let's check that helloworld.py is logging
     # correctly via the notifications plugin->lightningd
     assert n.daemon.is_in_log('Plugin helloworld.py initialized')

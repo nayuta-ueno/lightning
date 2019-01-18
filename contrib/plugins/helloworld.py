@@ -5,7 +5,7 @@ from lightning import Plugin
 plugin = Plugin(autopatch=True)
 
 
-@plugin.method("hello")
+@plugin.method("hello", "greeting")
 def hello(plugin, name="world"):
     """This is the documentation string for the hello-function.
 

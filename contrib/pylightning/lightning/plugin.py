@@ -26,6 +26,7 @@ class Plugin(object):
 
     def __init__(self, stdout=None, stdin=None, autopatch=True):
         self.methods = {'init': (self._init, MethodType.RPCMETHOD)}
+        self.usages = {}
         self.options = {}
 
         # A dict from topics to handler functions
@@ -73,6 +74,7 @@ class Plugin(object):
 
         # Register the function with the name
         self.methods[name] = (func, MethodType.RPCMETHOD)
+        self.usages[name] = usage
 
     def add_subscription(self, topic, func):
         """Add a subscription to our list of subscriptions.
@@ -134,8 +136,8 @@ class Plugin(object):
 
         Internally uses add_method.
         """
-        def decorator(f):
-            self.add_method(method_name, f)
+        def decorator(f, usage):
+            self.add_method(method_name, f, usage)
             return f
         return decorator
 
@@ -307,6 +309,7 @@ class Plugin(object):
             methods.append({
                 'name': name,
                 'description': doc,
+                'usage': self.usage[name]
             })
 
         return {

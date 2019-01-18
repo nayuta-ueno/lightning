@@ -25,7 +25,7 @@ class Plugin(object):
     """
 
     def __init__(self, stdout=None, stdin=None, autopatch=True):
-        self.methods = {}
+        self.methods = {'init': (self._init, MethodType.RPCMETHOD)}
         self.options = {}
 
         # A dict from topics to handler functions
@@ -158,6 +158,14 @@ class Plugin(object):
             return f
         return decorator
 
+    def init(self, *args, **kwargs):
+        """Decorator to add a function called after plugin initialization
+        """
+        def decorator(f):
+            self.init = f
+            return f
+        return decorator
+
     def _exec_func(self, func, request):
         params = request['params']
         sig = inspect.signature(func)
@@ -265,12 +273,6 @@ class Plugin(object):
         return msgs[-1]
 
     def run(self):
-        # Stash the init method handler, we'll handle opts first and
-        # then unstash this and call it.
-        if 'init' in self.methods:
-            self.init = self.methods['init']
-        self.methods['init'] = (self._init, MethodType.RPCMETHOD)
-
         partial = ""
         for l in self.stdin:
             partial += l

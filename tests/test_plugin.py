@@ -119,3 +119,25 @@ def test_pay_plugin(node_factory):
 
     with pytest.raises(RpcError, match=r'missing required parameter'):
         l1.rpc.call('pay')
+
+
+def test_async_rpcmethod(node_factory, executor):
+    """This tests the async rpcmethods.
+
+    It works in conjunction with the `asynctest` plugin which stashes
+    requests and then resolves all of them on the fifth call.
+    """
+    l1 = node_factory.get_node(options={'plugin': 'tests/plugins/asynctest.py'})
+
+    results = []
+    for i in range(4):
+        results.append(executor.submit(l1.rpc.callme, i))
+
+    # None of these should have returned yet
+    assert len([r for r in results if r.done()]) == 0
+
+    # This last one triggers the release and all results should be 42,
+    # since the last number is returned for all
+    l1.rpc.callme(42)
+
+    assert [r.result() for r in results] == [42]*4

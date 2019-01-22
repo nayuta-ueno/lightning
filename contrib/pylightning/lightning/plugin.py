@@ -113,7 +113,7 @@ class Plugin(object):
         if os.getenv('LIGHTNINGD_PLUGIN') and autopatch:
             monkey_patch(self, stdout=True, stderr=True)
 
-        self.add_method("getmanifest", self._getmanifest)
+        self.add_method("getmanifest", self._getmanifest, sync=True)
         self.rpc_filename = None
         self.lightning_dir = None
         self.rpc = None
@@ -121,7 +121,7 @@ class Plugin(object):
 
         self.write_lock = RLock()
 
-    def add_method(self, name, func):
+    def add_method(self, name, func, sync):
         """Add a plugin method to the dispatch table.
 
         The function will be expected at call time (see `_dispatch`)
@@ -149,6 +149,7 @@ class Plugin(object):
 
         # Register the function with the name
         method = Method(name, func, MethodType.RPCMETHOD)
+        method.asynchronous = not sync
         self.methods[name] = method
 
     def add_subscription(self, topic, func):
@@ -206,17 +207,17 @@ class Plugin(object):
         else:
             return self.options[name]['default']
 
-    def method(self, method_name, *args, **kwargs):
+    def method(self, method_name, *args, sync=True, **kwargs):
         """Decorator to add a plugin method to the dispatch table.
 
         Internally uses add_method.
         """
         def decorator(f):
-            self.add_method(method_name, f)
+            self.add_method(method_name, f, sync=sync)
             return f
         return decorator
 
-    def add_hook(self, name, func):
+    def add_hook(self, name, func, sync=True):
         """Register a hook that is called synchronously by lightningd on events
         """
         if name in self.methods:
@@ -224,15 +225,16 @@ class Plugin(object):
                 "Method {} was already registered".format(name, self.methods[name])
             )
         method = Method(name, func, MethodType.HOOK)
+        method.asynchronous = not sync
         self.methods[name] = method
 
-    def hook(self, method_name):
+    def hook(self, method_name, sync=True):
         """Decorator to add a plugin hook to the dispatch table.
 
         Internally uses add_hook.
         """
         def decorator(f):
-            self.add_hook(method_name, f)
+            self.add_hook(method_name, f, sync)
             return f
         return decorator
 

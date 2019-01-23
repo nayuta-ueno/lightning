@@ -151,17 +151,19 @@ def test_async_rpcmethod(node_factory, executor):
     l1 = node_factory.get_node(options={'plugin': 'tests/plugins/asynctest.py'})
 
     results = []
-    for i in range(4):
-        results.append(executor.submit(l1.rpc.callme, i))
+    for i in range(10):
+        results.append(executor.submit(l1.rpc.asyncqueue))
+
+    time.sleep(3)
 
     # None of these should have returned yet
     assert len([r for r in results if r.done()]) == 0
 
     # This last one triggers the release and all results should be 42,
     # since the last number is returned for all
-    l1.rpc.callme(42)
+    l1.rpc.asyncflush(42)
 
-    assert [r.result() for r in results] == [42] * 4
+    assert [r.result() for r in results] == [42] * len(results)
 
 
 def test_htlc_accepted_hook_fail(node_factory):

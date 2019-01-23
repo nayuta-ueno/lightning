@@ -12,16 +12,17 @@ plugin = Plugin()
 requests = []
 
 
-@plugin.method('callme', sync=False)
-def callme(i, request):
+@plugin.method('asyncqueue', sync=False)
+def async_queue(request):
     global requests
-
     requests.append(request)
-    if len(requests) < 5:
-        return
 
+
+@plugin.method('asyncflush')
+def async_flush(res):
+    global requests
     for r in requests:
-        r.set_result(i)
+        r.set_result(res)
 
 
 plugin.run()

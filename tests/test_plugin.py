@@ -140,4 +140,4 @@ def test_async_rpcmethod(node_factory, executor):
     # since the last number is returned for all
     l1.rpc.callme(42)
 
-    assert [r.result() for r in results] == [42]*4
+    assert [r.result() for r in results] == [42] * 4

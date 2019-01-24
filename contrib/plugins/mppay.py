@@ -13,7 +13,7 @@ class Payment(object):
         self.plugin = plugin
 
     def is_complete(self):
-        incoming = sum()
+        incoming = sum([p.htlc['msatoshi'] for p in self.parts])
         return incoming >= self.invoice['msatoshi']
 
     def resolve_all(self):
@@ -65,20 +65,22 @@ def mppay():
 
 @plugin.hook('htlc_accepted', sync=False)
 def on_htlc_accepted(htlc, onion, plugin, request):
+    plugin.log("Got an incoming htlc {}".format(repr(htlc)))
     h = htlc['payment_hash']
 
     # Check that we have a matching invoice, otherwise continue
     if h not in plugin.incoming_payments:
-        invs = plugin.rpc.listinvoices('h')['invoices']
-        if len(invs):
+        invs = plugin.rpc.listinvoices()['invoices']
+        invs = {i['payment_hash']: i for i in invs}
+        if h not in invs:
             plugin.log(
                 "Could not find an invoice for payment_hash {}".format(h)
             )
             return request.set_result({'result': 'continue'})
 
         # Now initialize the payment object, so we can assign parts
-        inv = invs[0]
-        p = Payment(h, inv)
+        inv = invs[h]
+        p = Payment(plugin, h, inv)
         Timer(300, p.timeout).start()
         plugin.incoming_payments[h] = p
 
@@ -89,7 +91,10 @@ def on_htlc_accepted(htlc, onion, plugin, request):
     ))
 
     if payment.is_complete():
+        plugin.log("Payment complete, resolving all HTLCs")
         payment.resolve_all()
+    else:
+        plugin.log("Payment still incomplete, waiting for more parts")
 
 
 plugin.run()

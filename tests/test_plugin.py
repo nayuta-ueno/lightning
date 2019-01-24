@@ -217,3 +217,35 @@ def test_htlc_accepted_hook_resolve(node_factory):
     # And the invoice must still be unpaid
     inv = l3.rpc.listinvoices("lbl")['invoices']
     assert len(inv) == 1 and inv[0]['status'] == 'unpaid'
+
+
+def test_multipart_pay_receive(node_factory):
+    l1, l2, l3 = node_factory.line_graph(3, opts=[
+        {},
+        {},
+        {'plugin': 'contrib/plugins/mppay.py'},
+    ], wait_for_announce=True)
+
+    inv = l3.rpc.invoice(
+        msatoshi=100000,
+        label='lbl',
+        description='desc',
+        preimage='00' * 32
+    )
+    print(inv)
+    print(l3.rpc.listinvoices())
+
+    route = l1.rpc.getroute(node_id=l3.info['id'],
+                            msatoshi=50000,
+                            riskfactor=1)['route']
+    l1.rpc.sendpay(route, inv['payment_hash'])
+
+    time.sleep(10)
+    # This should complete the payment
+    route = l2.rpc.getroute(node_id=l3.info['id'],
+                            msatoshi=50000,
+                            riskfactor=1)['route']
+    l2.rpc.sendpay(route, inv['payment_hash'])
+
+    l1.rpc.waitsendpay(inv['payment_hash'], 10)
+    l2.rpc.waitsendpay(inv['payment_hash'], 10)

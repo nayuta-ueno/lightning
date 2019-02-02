@@ -81,6 +81,7 @@ struct funding_channel {
 
 	/* Channel, subsequent owner of us */
 	struct uncommitted_channel *uc;
+	struct bitcoin_tx *fundingtx;
 };
 
 static void uncommitted_channel_disconnect(struct uncommitted_channel *uc,
@@ -242,6 +243,14 @@ static void funding_broadcast_success(struct channel *channel)
 	struct json_stream *response;
 	struct funding_channel *fc = channel->peer->uncommitted_channel->fc;
 	struct command *cmd = fc->cmd;
+	u64 change_satoshi;
+
+	/* Extract the change output and add it to the DB */
+	wallet_extract_owned_outputs(cmd->ld->wallet, fc->fundingtx, NULL,
+				     &change_satoshi);
+
+	/* Mark consumed outputs as spent */
+	wallet_confirm_utxos(cmd->ld->wallet, fc->wtx.utxos);
 
 	response = json_stream_success(cmd);
 	json_object_start(response, NULL);
@@ -272,7 +281,6 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 {
 	u8 *msg;
 	struct channel_info channel_info;
-	struct bitcoin_tx *fundingtx;
 	struct bitcoin_txid funding_txid, expected_txid;
 	struct pubkey changekey;
 	struct crypto_state cs;
@@ -280,7 +288,6 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 	struct bitcoin_tx *remote_commit;
 	u16 funding_outnum;
 	u32 feerate;
-	u64 change_satoshi;
 	struct channel *channel;
 	struct lightningd *ld = openingd->ld;
 
@@ -322,7 +329,7 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 			     &changekey, fc->wtx.change_key_index))
 		fatal("Error deriving change key %u", fc->wtx.change_key_index);
 
-	fundingtx = funding_tx(tmpctx, &funding_outnum,
+	fc->fundingtx = funding_tx(fc, &funding_outnum,
 			       fc->wtx.utxos, fc->wtx.amount,
 			       &fc->uc->local_funding_pubkey,
 			       &channel_info.remote_fundingkey,
@@ -330,18 +337,18 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 			       ld->wallet->bip32_base);
 
 	log_debug(fc->uc->log, "Funding tx has %zi inputs, %zu outputs:",
-		  tal_count(fundingtx->input),
-		  tal_count(fundingtx->output));
+		  tal_count(fc->fundingtx->input),
+		  tal_count(fc->fundingtx->output));
 
-	for (size_t i = 0; i < tal_count(fundingtx->input); i++) {
+	for (size_t i = 0; i < tal_count(fc->fundingtx->input); i++) {
 		log_debug(fc->uc->log, "%zi: %"PRIu64" satoshi (%s) %s\n",
 			  i, fc->wtx.utxos[i]->amount,
 			  fc->wtx.utxos[i]->is_p2sh ? "P2SH" : "SEGWIT",
 			  type_to_string(tmpctx, struct bitcoin_txid,
-					 &fundingtx->input[i].txid));
+					 &fc->fundingtx->input[i].txid));
 	}
 
-	bitcoin_txid(fundingtx, &funding_txid);
+	bitcoin_txid(fc->fundingtx, &funding_txid);
 
 	if (!bitcoin_txid_eq(&funding_txid, &expected_txid)) {
 		log_broken(fc->uc->log,
@@ -400,29 +407,23 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 		fatal("Could not write to HSM: %s", strerror(errno));
 
 	msg = wire_sync_read(fc, ld->hsm_fd);
-	if (!fromwire_hsm_sign_funding_reply(tmpctx, msg, &fundingtx))
+	if (!fromwire_hsm_sign_funding_reply(fc, msg, &fc->fundingtx))
 		fatal("HSM gave bad sign_funding_reply %s",
 		      tal_hex(msg, resp));
-
-	/* Extract the change output and add it to the DB */
-	wallet_extract_owned_outputs(ld->wallet, fundingtx, NULL, &change_satoshi);
 
 	/* Make sure we recognize our change output by its scriptpubkey in
 	 * future. This assumes that we have only two outputs, may not be true
 	 * if we add support for multifundchannel */
-	if (tal_count(fundingtx->output) == 2)
-		txfilter_add_scriptpubkey(ld->owned_txfilter, fundingtx->output[!funding_outnum].script);
+	if (tal_count(fc->fundingtx->output) == 2)
+		txfilter_add_scriptpubkey(ld->owned_txfilter, fc->fundingtx->output[!funding_outnum].script);
 
 	/* We need these to compose cmd's response in funding_broadcast_success */
-	fc->linear = linearize_tx(fc->cmd, fundingtx);
+	fc->linear = linearize_tx(fc->cmd, fc->fundingtx);
 	derive_channel_id(&fc->cid, &channel->funding_txid, funding_outnum);
 
 	/* Send it out and watch for confirms. */
-	broadcast_tx(ld->topology, channel, fundingtx, funding_broadcast_failed_or_success);
+	broadcast_tx(ld->topology, channel, fc->fundingtx, funding_broadcast_failed_or_success);
 	channel_watch_funding(ld, channel);
-
-	/* Mark consumed outputs as spent */
-	wallet_confirm_utxos(ld->wallet, fc->wtx.utxos);
 
 	/* Start normal channel daemon. */
 	peer_start_channeld(channel, &cs, fds[0], fds[1], NULL, false);

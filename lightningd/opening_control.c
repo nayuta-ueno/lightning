@@ -425,6 +425,11 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 	broadcast_tx(ld->topology, channel, fc->fundingtx, funding_broadcast_failed_or_success);
 	channel_watch_funding(ld, channel);
 
+	/* Mark consumed outputs as spent. This is done here since
+	 * otherwise the destructos of the utxos will unreserve
+	 * them. */
+	wallet_confirm_utxos(ld->wallet, fc->wtx.utxos);
+
 	/* Start normal channel daemon. */
 	peer_start_channeld(channel, &cs, fds[0], fds[1], NULL, false);
 

@@ -1207,3 +1207,31 @@ def test_bad_onion(node_factory, bitcoind):
     assert err.value.error['data']['failcode'] == WIRE_INVALID_ONION_HMAC
     assert err.value.error['data']['erring_node'] == mangled_nodeid
     assert err.value.error['data']['erring_channel'] == route[1]['channel']
+
+
+@unittest.skipIf(not DEVELOPER, "need dev-listaddrs")
+def test_wrong_addr(node_factory, bitcoind):
+    """`newaddr` in one format and send to the other.
+    """
+    l1 = node_factory.get_node()
+
+    # We start out with one address already configured. Let's try to send to both
+    addrs = l1.rpc.dev_listaddrs()['addresses']
+    assert(len(addrs) == 1)
+    bitcoind.rpc.sendtoaddress(addrs[0]['p2sh'], 0.01)
+    bitcoind.rpc.sendtoaddress(addrs[0]['bech32'], 0.02)
+    bitcoind.rpc.generate(1)
+    l1.daemon.wait_for_logs([r'Owning output \d 1000000 \(P2SH\)',r'Owning output \d 2000000 \(SEGWIT\)'])
+    assert(len(l1.rpc.listfunds()['outputs']) == 2)
+
+    # Now create a new address and send to both again
+    addr = l1.rpc.newaddr()['address']
+    addrs = l1.rpc.dev_listaddrs()['addresses']
+    assert(len(addrs) == 2)
+    assert(addrs[1]['bech32'] == addr)  # Just make sure to get the right one
+    print(addrs[1])
+    bitcoind.rpc.sendtoaddress(addrs[0]['p2sh'], 0.03)
+    bitcoind.rpc.sendtoaddress(addrs[0]['bech32'], 0.04)
+    bitcoind.rpc.generate(1)
+    l1.daemon.wait_for_logs([r'Owning output \d 3000000 \(P2SH\)',r'Owning output \d 4000000 \(SEGWIT\)'])
+    assert(len(l1.rpc.listfunds()['outputs']) == 4)

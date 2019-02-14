@@ -85,6 +85,47 @@ struct sphinx_path *sphinx_path_new_with_key(const tal_t *ctx,
 	return sp;
 }
 
+static size_t sphinx_hop_count_frames(const struct sphinx_hop *hop)
+{
+	size_t size = REALM_SIZE + tal_bytelen(hop->payload) + HMAC_SIZE;
+
+	/* Rounding up to the closest multiple of FRAME_SIZE) */
+	return (size + FRAME_SIZE - 1) / FRAME_SIZE;
+}
+
+static size_t sphinx_path_count_frames(const struct sphinx_path *path)
+{
+	size_t size = 0;
+	for (size_t i=0; i<tal_count(path->hops); i++)
+		size += sphinx_hop_count_frames(&path->hops[i]);
+	return size;
+}
+
+/**
+ * Add a raw payload hop to the path.
+ */
+static void sphinx_add_raw_hop(struct sphinx_path *path, const struct pubkey *pubkey, u8 realm,
+			       const u8 *payload)
+{
+	struct sphinx_hop sp;
+	sp.payload = payload;
+	sp.realm = realm;
+	sp.pubkey = *pubkey;
+	tal_arr_expand(&path->hops, sp);
+	assert(sphinx_path_count_frames(path) <= NUM_MAX_FRAMES);
+}
+
+void sphinx_add_v0_hop(struct sphinx_path *path, const struct pubkey *pubkey,
+		       const struct short_channel_id *scid, u64 amt_forward,
+		       u32 outgoing_cltv)
+{
+	u8 *buf = tal_arr(path, u8, 0);
+	towire_short_channel_id(&buf, scid);
+	towire_u64(&buf, amt_forward);
+	towire_u32(&buf, outgoing_cltv);
+	sphinx_add_raw_hop(path, pubkey, 0, buf);
+}
+
 /* Small helper to append data to a buffer and update the position
  * into the buffer
  */

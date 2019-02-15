@@ -109,11 +109,7 @@ struct route_step {
  */
 struct onionpacket *create_onionpacket(
 	const tal_t * ctx,
-	struct pubkey path[],
-	struct hop_data hops_data[],
-	const u8 * sessionkey,
-	const u8 *assocdata,
-	const size_t assocdatalen,
+	struct sphinx_path *sp,
 	struct secret **path_secrets
 	);
 

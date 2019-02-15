@@ -594,10 +594,13 @@ send_payment(struct lightningd *ld,
 	struct short_channel_id *channels;
 	struct routing_failure *fail;
 	struct channel *channel;
+	struct sphinx_path *path;
+	struct short_channel_id finalscid;
 
 	/* Expiry for HTLCs is absolute.  And add one to give some margin. */
 	base_expiry = get_block_height(ld->topology) + 1;
 
+	path = sphinx_path_new(tmpctx, rhash->u.u8);
 	/* Extract IDs for each hop: create_onionpacket wants array. */
 	for (i = 0; i < n_hops; i++)
 		ids[i] = route[i].nodeid;
@@ -608,6 +611,9 @@ send_payment(struct lightningd *ld,
 		hop_data[i].channel_id = route[i+1].channel_id;
 		hop_data[i].amt_forward = route[i+1].amount;
 		hop_data[i].outgoing_cltv = base_expiry + route[i+1].delay;
+		sphinx_add_v0_hop(path, &ids[i], &route[i + 1].channel_id,
+				  route[i + 1].amount,
+				  base_expiry + route[i + 1].delay);
 	}
 
 	/* And finally set the final hop to the special values in
@@ -616,6 +622,11 @@ send_payment(struct lightningd *ld,
 	hop_data[i].outgoing_cltv = base_expiry + route[i].delay;
 	memset(&hop_data[i].channel_id, 0, sizeof(struct short_channel_id));
 	hop_data[i].amt_forward = route[i].amount;
+
+	memset(&finalscid, 0, sizeof(struct short_channel_id));
+	sphinx_add_v0_hop(path, &ids[i], &finalscid,
+			  route[i].amount,
+			  base_expiry + route[i].delay);
 
 	/* Now, do we already have a payment? */
 	payment = wallet_payment_by_hash(tmpctx, ld->wallet, rhash);
@@ -663,8 +674,7 @@ send_payment(struct lightningd *ld,
 	randombytes_buf(&sessionkey, sizeof(sessionkey));
 
 	/* Onion will carry us from first peer onwards. */
-	packet = create_onionpacket(tmpctx, ids, hop_data, sessionkey, rhash->u.u8,
-				    sizeof(struct sha256), &path_secrets);
+	packet = create_onionpacket(tmpctx, path, &path_secrets);
 	onion = serialize_onionpacket(tmpctx, packet);
 
 	log_info(ld->log, "Sending %"PRIu64" over %zu hops to deliver %"PRIu64"",

@@ -587,7 +587,6 @@ send_payment(struct lightningd *ld,
 	struct secret *path_secrets;
 	enum onion_type failcode;
 	size_t i, n_hops = tal_count(route);
-	struct hop_data *hop_data = tal_arr(tmpctx, struct hop_data, n_hops);
 	struct pubkey *ids = tal_arr(tmpctx, struct pubkey, n_hops);
 	struct wallet_payment *payment = NULL;
 	struct htlc_out *hout;
@@ -599,32 +598,20 @@ send_payment(struct lightningd *ld,
 
 	/* Expiry for HTLCs is absolute.  And add one to give some margin. */
 	base_expiry = get_block_height(ld->topology) + 1;
+	memset(&finalscid, 0, sizeof(struct short_channel_id));
 
 	path = sphinx_path_new(tmpctx, rhash->u.u8);
 	/* Extract IDs for each hop: create_onionpacket wants array. */
 	for (i = 0; i < n_hops; i++)
 		ids[i] = route[i].nodeid;
-
-	/* Copy hop_data[n] from route[n+1] (ie. where it goes next) */
-	for (i = 0; i < n_hops - 1; i++) {
-		hop_data[i].realm = 0;
-		hop_data[i].channel_id = route[i+1].channel_id;
-		hop_data[i].amt_forward = route[i+1].amount;
-		hop_data[i].outgoing_cltv = base_expiry + route[i+1].delay;
-		sphinx_add_v0_hop(path, &ids[i], &route[i + 1].channel_id,
+	for (i = 0; i < n_hops - 1; i++)
+		sphinx_add_v0_hop(path, &route[i].nodeid, &route[i + 1].channel_id,
 				  route[i + 1].amount,
 				  base_expiry + route[i + 1].delay);
-	}
 
 	/* And finally set the final hop to the special values in
 	 * BOLT04 */
-	hop_data[i].realm = 0;
-	hop_data[i].outgoing_cltv = base_expiry + route[i].delay;
-	memset(&hop_data[i].channel_id, 0, sizeof(struct short_channel_id));
-	hop_data[i].amt_forward = route[i].amount;
-
-	memset(&finalscid, 0, sizeof(struct short_channel_id));
-	sphinx_add_v0_hop(path, &ids[i], &finalscid,
+	sphinx_add_v0_hop(path, &route[i].nodeid, &finalscid,
 			  route[i].amount,
 			  base_expiry + route[i].delay);
 

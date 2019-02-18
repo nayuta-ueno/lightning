@@ -42,6 +42,47 @@ static void do_generate(int argc, char **argv)
 	tal_free(ctx);
 }
 
+static void do_long_generate(int argc, char **argv)
+{
+	const tal_t *ctx = talz(NULL, tal_t);
+	int num_hops = argc - 1;
+	struct pubkey pubkey;
+	struct secret session_key;
+	struct secret *shared_secrets;
+	u8 *assocdata;
+	struct sphinx_path *sp;
+	struct short_channel_id scid;
+
+	assocdata = tal_arr(ctx, u8, 32);
+	memset(&session_key, 'A', sizeof(struct secret));
+	memset(assocdata, 'B', tal_bytelen(assocdata));
+	sp = sphinx_path_new_with_key(ctx, assocdata, &session_key);
+
+	for (int i = 0; i < num_hops; i++) {
+		if (!pubkey_from_hexstr(argv[i+1], strlen(argv[i+1]), &pubkey))
+			errx(1, "Invalid public key hex '%s'", argv[1 + i]);
+
+		if (i != 2) {
+			memset(&scid, i, sizeof(struct short_channel_id));
+			sphinx_add_v0_hop(sp, &pubkey, &scid, i, i);
+		} else {
+			u8 *payload = tal_arr(ctx, u8, 256);
+			for (int j=0;j<256;j++)
+				payload[j] = j;
+			printf("Payload: %s\n", tal_hexstr(NULL, payload, 256));
+			sphinx_add_raw_hop(sp, &pubkey, 0, payload);
+		}
+	}
+
+	struct onionpacket *res = create_onionpacket(ctx, sp, &shared_secrets);
+
+	u8 *serialized = serialize_onionpacket(ctx, res);
+	if (!serialized)
+		errx(1, "Error serializing message.");
+	printf("%s\n", tal_hex(ctx, serialized));
+	tal_free(ctx);
+}
+
 static void do_decode(int argc, char **argv)
 {
 	struct route_step *step;
@@ -66,7 +107,7 @@ static void do_decode(int argc, char **argv)
 	if (!read_all(STDIN_FILENO, hextemp, sizeof(hextemp)))
 		errx(1, "Reading in onion");
 
-	if (!hex_decode(hextemp, sizeof(hextemp), serialized, sizeof(serialized))) {
+	if (!hex_decode(hextemp, 2*TOTAL_PACKET_SIZE, serialized, TOTAL_PACKET_SIZE)) {
 		errx(1, "Invalid onion hex '%s'", hextemp);
 	}
 
@@ -96,7 +137,7 @@ int main(int argc, char **argv)
 {
 	setup_locale();
 
-	bool generate = false, decode = false;
+	bool generate = false, decode = false, mfgenerate = false;
 	secp256k1_ctx = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY |
 						 SECP256K1_CONTEXT_SIGN);
 
@@ -107,6 +148,8 @@ int main(int argc, char **argv)
 			   "Print this message.");
 	opt_register_noarg("--generate", opt_set_bool, &generate,
 			   "Generate onion through the given hex pubkeys");
+	opt_register_noarg("--mfgenerate", opt_set_bool, &mfgenerate,
+			   "Generate onion through the given hex pubkeys");
 	opt_register_noarg("--decode", opt_set_bool, &decode,
 			   "Decode onion from stdin given the private key");
 
@@ -114,6 +157,8 @@ int main(int argc, char **argv)
 
 	if (generate)
 		do_generate(argc, argv);
+	else if (mfgenerate)
+		do_long_generate(argc, argv);
 	else if (decode)
 		do_decode(argc, argv);
 	return 0;

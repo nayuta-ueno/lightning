@@ -232,4 +232,10 @@ struct sphinx_path *sphinx_path_new_with_key(const tal_t *ctx,
 void sphinx_add_v0_hop(struct sphinx_path *path, const struct pubkey *pubkey,
 		       const struct short_channel_id *scid, u64 amt_forward,
 		       u32 outgoing_cltv);
+/**
+ * Add a raw payload hop to the path.
+ */
+void sphinx_add_raw_hop(struct sphinx_path *path, const struct pubkey *pubkey,
+			u8 realm, const u8 *payload);
+
 #endif /* LIGHTNING_COMMON_SPHINX_H */

@@ -12,27 +12,24 @@
 #include <ccan/build_assert/build_assert.h>
 #include <ccan/tal/str/str.h>
 #include <common/utils.h>
-#include <libbase58.h>
 #include <string.h>
-
-static bool my_sha256(void *digest, const void *data, size_t datasz)
-{
-	sha256(digest, data, datasz);
-	return true;
-}
+#include <wally_core.h>
 
 static char *to_base58(const tal_t *ctx, u8 version,
 		       const struct ripemd160 *rmd)
 {
-	char out[BASE58_ADDR_MAX_LEN + 1];
-	size_t outlen = sizeof(out);
+	u8 raw[sizeof(*rmd) + 1];
+	char *out, *res;
+	raw[0] = version;
+	memcpy(raw + 1, rmd, sizeof(*rmd));
+	wally_base58_from_bytes(raw, sizeof(raw), BASE58_FLAG_CHECKSUM, &out);
 
-	b58_sha256_impl = my_sha256;
-	if (!b58check_enc(out, &outlen, version, rmd, sizeof(*rmd))) {
+	if (out == NULL)
 		return NULL;
-	}else{
-		return tal_strdup(ctx, out);
-	}
+
+	res = tal_strdup(ctx, out);
+	wally_free_string(out);
+	return res;
 }
 
 char *bitcoin_to_base58(const tal_t *ctx, bool test_net,
@@ -47,22 +44,26 @@ char *p2sh_to_base58(const tal_t *ctx, bool test_net,
 	return to_base58(ctx, test_net ? 196 : 5, p2sh);
 }
 
-static bool from_base58(u8 *version,
-			struct ripemd160 *rmd,
-			const char *base58, size_t base58_len)
+static bool from_base58(u8 *version, struct ripemd160 *rmd, const char *base58,
+			size_t base58_len)
 {
-	u8 buf[1 + sizeof(*rmd) + 4];
+	size_t written;
+	u8 buf[1 + sizeof(*rmd) + BASE58_CHECKSUM_LEN];
+	char b58[base58_len + 1];
 	/* Avoid memcheck complaining if decoding resulted in a short value */
 	memset(buf, 0, sizeof(buf));
-	b58_sha256_impl = my_sha256;
+	/* libwally uses strlen internally, so this must be 0-terminated */
+	memcpy(b58, base58, base58_len);
+	b58[base58_len] = 0;
 
-	size_t buflen = sizeof(buf);
-	b58tobin(buf, &buflen, base58, base58_len);
+	if (wally_base58_to_bytes(b58, BASE58_FLAG_CHECKSUM, buf, sizeof(buf),
+				  &written) == WALLY_EINVAL)
+		return false;
+	assert(written == sizeof(buf) - BASE58_CHECKSUM_LEN);
 
-	int r = b58check(buf, buflen, base58, base58_len);
 	*version = buf[0];
 	memcpy(rmd, buf + 1, sizeof(*rmd));
-	return r >= 0;
+	return true;
 }
 
 bool bitcoin_from_base58(bool *test_net,
@@ -106,12 +107,13 @@ bool key_from_base58(const char *base58, size_t base58_len,
 {
 	// 1 byte version, 32 byte private key, 1 byte compressed, 4 byte checksum
 	u8 keybuf[1 + 32 + 1 + 4];
-	size_t keybuflen = sizeof(keybuf);
+	char b58[base58_len + 1];
+	size_t written;
+	memcpy(b58, base58, base58_len);
+	b58[base58_len] = 0;
 
-	b58_sha256_impl = my_sha256;
-
-	b58tobin(keybuf, &keybuflen, base58, base58_len);
-	if (b58check(keybuf, sizeof(keybuf), base58, base58_len) < 0)
+	if (wally_base58_to_bytes(b58, BASE58_FLAG_CHECKSUM, keybuf, sizeof(keybuf),
+				  &written) == WALLY_EINVAL)
 		return false;
 
 	/* Byte after key should be 1 to represent a compressed key. */

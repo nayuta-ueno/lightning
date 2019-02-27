@@ -57,7 +57,7 @@ static bool from_base58(u8 *version, struct ripemd160 *rmd, const char *base58,
 	b58[base58_len] = 0;
 
 	if (wally_base58_to_bytes(b58, BASE58_FLAG_CHECKSUM, buf, sizeof(buf),
-				  &written) == WALLY_EINVAL)
+				  &written) != WALLY_OK)
 		return false;
 	assert(written == sizeof(buf) - BASE58_CHECKSUM_LEN);
 

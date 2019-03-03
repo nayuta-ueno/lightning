@@ -8,7 +8,7 @@ notifications:
 addons:
   apt:
     packages:
-      - asciidoc-base
+      - asciidoc
       - python3-pip
       - libsqlite3-dev
       - shellcheck

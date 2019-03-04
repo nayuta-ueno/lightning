@@ -21,6 +21,8 @@ struct chainparams {
 
 	/* Whether this is a test network or not */
 	const bool testnet;
+
+	const int wally_tx_flags;
 };
 
 /**

@@ -340,6 +340,10 @@ struct bitcoin_tx *bitcoin_tx(const tal_t *ctx, varint_t input_count,
 	struct bitcoin_tx *tx = tal(ctx, struct bitcoin_tx);
 	size_t i;
 
+	wally_tx_init_alloc(WALLY_TX_VERSION_2, 0, input_count, output_count,
+			    &tx->wtx);
+	tal_add_destructor(tx, bitcoin_tx_destroy);
+
 	tx->output = tal_arrz(tx, struct bitcoin_tx_output, output_count);
 	tx->input = tal_arrz(tx, struct bitcoin_tx_input, input_count);
 	for (i = 0; i < tal_count(tx->input); i++) {

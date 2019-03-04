@@ -22,6 +22,8 @@ struct chainparams {
 	/* Whether this is a test network or not */
 	const bool testnet;
 
+	/* Flags to be passed to wally when serializing/deserializing
+	 * transactions. */
 	const int wally_tx_flags;
 };
 

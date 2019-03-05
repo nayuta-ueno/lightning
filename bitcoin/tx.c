@@ -451,7 +451,10 @@ struct bitcoin_tx *pull_bitcoin_tx(const tal_t *ctx, const u8 **cursor,
 	u64 count;
 	u8 flag = 0;
 	struct bitcoin_tx *tx = tal(ctx, struct bitcoin_tx);
-	wally_tx_from_bytes(*cursor, *max, 0, &tx->wtx);
+	if (wally_tx_from_bytes(*cursor, *max, 0, &tx->wtx) != WALLY_OK) {
+		*cursor = 0;
+		return tal_free(tx);
+	}
 	tal_add_destructor(tx, bitcoin_tx_destroy);
 
 	assert(pull_le32(cursor, max) == tx->wtx->version);

@@ -298,7 +298,7 @@ static struct bitcoin_tx *tx_to_us(const tal_t *ctx,
 	u8 *msg;
 
 	tx = bitcoin_tx(ctx, 1, 1);
-	tx->lock_time = locktime;
+	tx->wtx->locktime = locktime;
 	tx->input[0].sequence_number = to_self_delay;
 	tx->input[0].txid = out->txid;
 	tx->input[0].index = out->outnum;

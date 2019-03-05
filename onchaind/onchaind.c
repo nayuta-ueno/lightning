@@ -647,7 +647,7 @@ static u64 unmask_commit_number(const struct bitcoin_tx *tx,
 	 *...
 	 * * `txin[0]` sequence: upper 8 bits are 0x80, lower 24 bits are upper 24 bits of the obscured commitment number
 	 */
-	return ((tx->lock_time & 0x00FFFFFF)
+	return ((tx->wtx->locktime & 0x00FFFFFF)
 		| (tx->input[0].sequence_number & (u64)0x00FFFFFF) << 24)
 		^ obscurer;
 }

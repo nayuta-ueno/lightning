@@ -15,6 +15,40 @@
 
 static struct sha256_double all_zeroes;
 
+void bitcoin_tx_add_input(struct bitcoin_tx *tx,
+			  const struct bitcoin_txid *txid, u32 outnum,
+			  u32 sequence, const struct amount_sat amount,
+			  u8 *script)
+{
+	size_t i = tx->used_inputs;
+	assert(tx->used_inputs < tal_count(tx->input));
+	tx->input[i].txid = *txid;
+	tx->input[i].index = outnum;;
+	tx->input[i].amount = tal_dup(tx->input, struct amount_sat, &amount);
+	tx->input[i].sequence_number = sequence;
+	tx->input[i].script = script;
+
+	wally_tx_add_raw_input(tx->wtx, txid->shad.sha.u.u8,
+			       sizeof(struct bitcoin_txid), outnum, sequence,
+			       script, tal_bytelen(script),
+			       NULL /* empty witnesses */, 0);
+	tx->used_inputs++;
+}
+
+void bitcoin_tx_add_output(struct bitcoin_tx *tx, u8 *script,
+			   struct amount_sat amount)
+{
+	size_t i = tx->used_outputs;
+	assert(tx->used_outputs < tal_count(tx->output));
+	tx->output[i].amount = amount;
+	tx->output[i].script = script;
+
+	wally_tx_add_raw_output(tx->wtx, amount.satoshis, script,
+				tal_bytelen(script), 0);
+
+	tx->used_outputs++;
+}
+
 static void push_tx_input(const struct bitcoin_tx_input *input,
 			  const u8 *input_script,
 			  void (*push)(const void *, size_t, void *), void *pushp)

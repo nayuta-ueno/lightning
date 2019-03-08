@@ -373,6 +373,8 @@ struct bitcoin_tx *bitcoin_tx(const tal_t *ctx, varint_t input_count,
 {
 	struct bitcoin_tx *tx = tal(ctx, struct bitcoin_tx);
 	size_t i;
+	tx->used_inputs = 0;
+	tx->used_outputs = 0;
 
 	wally_tx_init_alloc(WALLY_TX_VERSION_2, 0, input_count, output_count,
 			    &tx->wtx);
@@ -502,11 +504,15 @@ struct bitcoin_tx *pull_bitcoin_tx(const tal_t *ctx, const u8 **cursor,
 	}
 
 	tx->input = tal_arr(tx, struct bitcoin_tx_input, count);
+	tx->used_inputs = count;
+
 	for (i = 0; i < tal_count(tx->input); i++)
 		pull_input(tx, cursor, max, tx->input + i);
 
 	count = pull_length(cursor, max, 8 + 1);
 	tx->output = tal_arr(tx, struct bitcoin_tx_output, count);
+	tx->used_outputs = count;
+
 	for (i = 0; i < tal_count(tx->output); i++)
 		pull_output(tx, cursor, max, tx->output + i);
 

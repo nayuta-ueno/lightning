@@ -34,8 +34,7 @@ static size_t find_best_in(struct bitcoin_tx_input *inputs, size_t num)
 }
 
 static void swap_inputs(struct bitcoin_tx_input *inputs,
-			const void **map,
-			size_t i1, size_t i2)
+			const void **map, size_t i1, size_t i2)
 {
 	struct bitcoin_tx_input tmpinput;
 	const void *tmp;
@@ -54,11 +53,33 @@ static void swap_inputs(struct bitcoin_tx_input *inputs,
 	}
 }
 
-void permute_inputs(struct bitcoin_tx_input *inputs,
+static void swap_wally_inputs(struct wally_tx *tx,
+			      const void **map,
+			      size_t i1, size_t i2)
+{
+	struct wally_tx_input tmpinput;
+	const void *tmp;
+
+	if (i1 == i2)
+		return;
+
+	tmpinput = tx->inputs[i1];
+	tx->inputs[i1] = tx->inputs[i2];
+	tx->inputs[i2] = tmpinput;
+
+	if (map) {
+		tmp = map[i1];
+		map[i1] = map[i2];
+		map[i2] = tmp;
+	}
+}
+
+void permute_inputs(struct wally_tx *tx, struct bitcoin_tx_input *inputs,
 		    const void **map)
 {
 	size_t i;
 	size_t num_inputs = tal_count(inputs);
+	int best_pos;
 
 	/* We can't permute nothing! */
 	if (num_inputs == 0)
@@ -67,8 +88,12 @@ void permute_inputs(struct bitcoin_tx_input *inputs,
 	/* Now do a dumb sort (num_inputs is small). */
 	for (i = 0; i < num_inputs-1; i++) {
 		/* Swap best into first place. */
-		swap_inputs(inputs, map,
-			    i, i + find_best_in(inputs + i, num_inputs - i));
+		best_pos = find_best_in(inputs + i, num_inputs - i);
+		swap_inputs(inputs, map, i, i + best_pos);
+
+		/* TODO(cdecker) Remove condition once we finish migration to libwally */
+		if (tx->num_inputs == num_inputs)
+			swap_wally_inputs(tx, NULL, i, i + best_pos);
 	}
 }
 
@@ -85,6 +110,32 @@ static void swap_outputs(struct bitcoin_tx_output *outputs,
 	tmpoutput = outputs[i1];
 	outputs[i1] = outputs[i2];
 	outputs[i2] = tmpoutput;
+
+	if (map) {
+		const void *tmp = map[i1];
+		map[i1] = map[i2];
+		map[i2] = tmp;
+	}
+
+	if (cltvs) {
+		u32 tmp = cltvs[i1];
+		cltvs[i1] = cltvs[i2];
+		cltvs[i2] = tmp;
+	}
+}
+
+static void swap_wally_outputs(struct wally_tx *tx,
+			       const void **map, u32 *cltvs, size_t i1,
+			       size_t i2)
+{
+	struct wally_tx_output tmpoutput;
+
+	if (i1 == i2)
+		return;
+
+	tmpoutput = tx->outputs[i1];
+	tx->outputs[i1] = tx->outputs[i2];
+	tx->outputs[i2] = tmpoutput;
 
 	if (map) {
 		const void *tmp = map[i1];
@@ -149,12 +200,13 @@ static size_t find_best_out(struct bitcoin_tx_output *outputs,
 	return best;
 }
 
-void permute_outputs(struct bitcoin_tx_output *outputs,
+void permute_outputs(struct wally_tx *tx, struct bitcoin_tx_output *outputs,
 		     u32 *cltvs,
 		     const void **map)
 {
 	size_t i;
 	size_t num_outputs = tal_count(outputs);
+	int best_pos;
 
 	/* We can't permute nothing! */
 	if (num_outputs == 0)
@@ -162,10 +214,13 @@ void permute_outputs(struct bitcoin_tx_output *outputs,
 
 	/* Now do a dumb sort (num_outputs is small). */
 	for (i = 0; i < num_outputs-1; i++) {
+		best_pos = find_best_out(outputs + i, cltvs ? cltvs + i : NULL,
+					 num_outputs - i);
 		/* Swap best into first place. */
-		swap_outputs(outputs, map, cltvs,
-			     i, i + find_best_out(outputs + i,
-						  cltvs ? cltvs + i : NULL,
-						  num_outputs - i));
+		swap_outputs(outputs, map, cltvs, i, i + best_pos);
+
+		/* TODO(cdecker) Remove conditional once we finish the migration to libwally */
+		if (tx->num_outputs == num_outputs)
+			swap_wally_outputs(tx, NULL, cltvs, i, i + best_pos);
 	}
 }

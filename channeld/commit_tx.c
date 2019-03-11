@@ -272,7 +272,7 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 	 * 7. Sort the outputs into [BIP 69
 	 *    order](#transaction-input-and-output-ordering)
 	 */
-	permute_outputs(tx->output, cltvs, (const void **)*htlcmap);
+	permute_outputs(tx->wtx, tx->output, cltvs, (const void **)*htlcmap);
 
 	/* BOLT #3:
 	 *

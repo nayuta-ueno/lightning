@@ -70,8 +70,8 @@ static void add_offered_htlc_out(struct bitcoin_tx *tx, size_t n,
 
 	ripemd160(&ripemd, htlc->rhash.u.u8, sizeof(htlc->rhash.u.u8));
 	wscript = htlc_offered_wscript(tx->output, &ripemd, keyset);
-	tx->output[n].amount = amount_msat_to_sat_round_down(htlc->amount);
-	tx->output[n].script = scriptpubkey_p2wsh(tx, wscript);
+	bitcoin_tx_add_output(tx, scriptpubkey_p2wsh(tx, wscript),
+			      amount_msat_to_sat_round_down(htlc->amount));
 	SUPERVERBOSE("# HTLC %"PRIu64" offered %s wscript %s\n",
 		     htlc->id,
 		     type_to_string(tmpctx, struct amount_sat,
@@ -89,8 +89,8 @@ static void add_received_htlc_out(struct bitcoin_tx *tx, size_t n,
 
 	ripemd160(&ripemd, htlc->rhash.u.u8, sizeof(htlc->rhash.u.u8));
 	wscript = htlc_received_wscript(tx, &ripemd, &htlc->expiry, keyset);
-	tx->output[n].amount = amount_msat_to_sat_round_down(htlc->amount);
-	tx->output[n].script = scriptpubkey_p2wsh(tx->output, wscript);
+	bitcoin_tx_add_output(tx, scriptpubkey_p2wsh(tx->output, wscript),
+			      amount_msat_to_sat_round_down(htlc->amount));
 	SUPERVERBOSE("# HTLC %"PRIu64" received %s wscript %s\n",
 		     htlc->id,
 		     type_to_string(tmpctx, struct amount_sat,
@@ -119,7 +119,7 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 	struct amount_msat total_pay;
 	struct bitcoin_tx *tx;
 	size_t i, n, untrimmed;
-	u32 *cltvs;
+	u32 *cltvs, sequence;
 
 	if (!amount_msat_add(&total_pay, self_pay, other_pay))
 		abort();
@@ -223,8 +223,8 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 	 */
 	if (amount_msat_greater_eq_sat(self_pay, dust_limit)) {
 		u8 *wscript = to_self_wscript(tmpctx, to_self_delay,keyset);
-		tx->output[n].amount = amount_msat_to_sat_round_down(self_pay);
-		tx->output[n].script = scriptpubkey_p2wsh(tx, wscript);
+		bitcoin_tx_add_output(tx, scriptpubkey_p2wsh(tx, wscript),
+				      amount_msat_to_sat_round_down(self_pay));
 		(*htlcmap)[n] = NULL;
 		/* We don't assign cltvs[n]: if we use it, order doesn't matter.
 		 * However, valgrind will warn us something wierd is happening */
@@ -249,12 +249,13 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 		 * This output sends funds to the other peer and thus is a simple
 		 * P2WPKH to `remotepubkey`.
 		 */
-		tx->output[n].amount = amount_msat_to_sat_round_down(other_pay);
-		tx->output[n].script = scriptpubkey_p2wpkh(tx,
-						   &keyset->other_payment_key);
+		bitcoin_tx_add_output(
+		    tx, scriptpubkey_p2wpkh(tx, &keyset->other_payment_key),
+		    amount_msat_to_sat_round_down(other_pay));
 		(*htlcmap)[n] = NULL;
 		/* We don't assign cltvs[n]: if we use it, order doesn't matter.
-		 * However, valgrind will warn us something wierd is happening */
+		 * However, valgrind will warn us something wierd is happening
+		 */
 		SUPERVERBOSE("# to-remote amount %s P2WPKH(%s)\n",
 			     type_to_string(tmpctx, struct amount_sat,
 					    &tx->output[n].amount),
@@ -291,22 +292,16 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 
 	/* BOLT #3:
 	 *
+	 *    * `txin[0]` sequence: upper 8 bits are 0x80, lower 24 bits are upper 24 bits of the obscured commitment number
+	 */
+	sequence = (0x80000000 | ((obscured_commitment_number>>24) & 0xFFFFFF));
+	/* BOLT #3:
+	 *
 	 * * txin count: 1
 	 *    * `txin[0]` outpoint: `txid` and `output_index` from
 	 *      `funding_created` message
 	 */
-	tx->input[0].txid = *funding_txid;
-	tx->input[0].index = funding_txout;
-
-	/* BOLT #3:
-	 *
-	 *    * `txin[0]` sequence: upper 8 bits are 0x80, lower 24 bits are upper 24 bits of the obscured commitment number
-	 */
-	tx->input[0].sequence_number
-		= (0x80000000 | ((obscured_commitment_number>>24) & 0xFFFFFF));
-
-	/* Input amount needed for signature code. */
-	tx->input[0].amount = tal_dup(tx->input, struct amount_sat, &funding);
+	bitcoin_tx_add_input(tx, funding_txid, funding_txout, sequence, funding, NULL);
 
 	return tx;
 }

@@ -66,16 +66,15 @@ static void add_offered_htlc_out(struct bitcoin_tx *tx, size_t n,
 				 const struct keyset *keyset)
 {
 	struct ripemd160 ripemd;
-	u8 *wscript;
+	u8 *wscript, *p2wsh;
+	struct amount_sat amount = amount_msat_to_sat_round_down(htlc->amount);
 
 	ripemd160(&ripemd, htlc->rhash.u.u8, sizeof(htlc->rhash.u.u8));
 	wscript = htlc_offered_wscript(tx->output, &ripemd, keyset);
-	bitcoin_tx_add_output(tx, scriptpubkey_p2wsh(tx, wscript),
-			      amount_msat_to_sat_round_down(htlc->amount));
-	SUPERVERBOSE("# HTLC %"PRIu64" offered %s wscript %s\n",
-		     htlc->id,
-		     type_to_string(tmpctx, struct amount_sat,
-				    &tx->output[n].amount),
+	p2wsh = scriptpubkey_p2wsh(tx, wscript);
+	bitcoin_tx_add_output(tx, p2wsh, amount);
+	SUPERVERBOSE("# HTLC %" PRIu64 " offered %s wscript %s\n", htlc->id,
+		     type_to_string(tmpctx, struct amount_sat, &amount),
 		     tal_hex(wscript, wscript));
 	tal_free(wscript);
 }
@@ -85,16 +84,15 @@ static void add_received_htlc_out(struct bitcoin_tx *tx, size_t n,
 				  const struct keyset *keyset)
 {
 	struct ripemd160 ripemd;
-	u8 *wscript;
+	u8 *wscript, *p2wsh;
+	struct amount_sat amount = amount_msat_to_sat_round_down(htlc->amount);
 
 	ripemd160(&ripemd, htlc->rhash.u.u8, sizeof(htlc->rhash.u.u8));
 	wscript = htlc_received_wscript(tx, &ripemd, &htlc->expiry, keyset);
-	bitcoin_tx_add_output(tx, scriptpubkey_p2wsh(tx->output, wscript),
-			      amount_msat_to_sat_round_down(htlc->amount));
-	SUPERVERBOSE("# HTLC %"PRIu64" received %s wscript %s\n",
-		     htlc->id,
-		     type_to_string(tmpctx, struct amount_sat,
-				    &tx->output[n].amount),
+	p2wsh = scriptpubkey_p2wsh(tx->output, wscript);
+	bitcoin_tx_add_output(tx, p2wsh, amount);
+	SUPERVERBOSE("# HTLC %" PRIu64 " received %s wscript %s\n", htlc->id,
+		     type_to_string(tmpctx, struct amount_sat, amount),
 		     tal_hex(wscript, wscript));
 	tal_free(wscript);
 }
@@ -115,11 +113,12 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 			     u64 obscured_commitment_number,
 			     enum side side)
 {
-	struct amount_sat base_fee;
+	struct amount_sat base_fee, amount;
 	struct amount_msat total_pay;
 	struct bitcoin_tx *tx;
 	size_t i, n, untrimmed;
 	u32 *cltvs, sequence;
+	u8 *p2wsh, *p2wpkh;
 
 	if (!amount_msat_add(&total_pay, self_pay, other_pay))
 		abort();
@@ -223,8 +222,9 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 	 */
 	if (amount_msat_greater_eq_sat(self_pay, dust_limit)) {
 		u8 *wscript = to_self_wscript(tmpctx, to_self_delay,keyset);
-		bitcoin_tx_add_output(tx, scriptpubkey_p2wsh(tx, wscript),
-				      amount_msat_to_sat_round_down(self_pay));
+		p2wsh = scriptpubkey_p2wsh(tx, wscript);
+		amount = amount_msat_to_sat_round_down(self_pay);
+		bitcoin_tx_add_output(tx, p2wsh, amount);
 		(*htlcmap)[n] = NULL;
 		/* We don't assign cltvs[n]: if we use it, order doesn't matter.
 		 * However, valgrind will warn us something wierd is happening */
@@ -249,9 +249,9 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 		 * This output sends funds to the other peer and thus is a simple
 		 * P2WPKH to `remotepubkey`.
 		 */
-		bitcoin_tx_add_output(
-		    tx, scriptpubkey_p2wpkh(tx, &keyset->other_payment_key),
-		    amount_msat_to_sat_round_down(other_pay));
+		p2wpkh = scriptpubkey_p2wpkh(tx, &keyset->other_payment_key);
+		amount = amount_msat_to_sat_round_down(other_pay);
+		bitcoin_tx_add_output(tx, p2wpkh, amount);
 		(*htlcmap)[n] = NULL;
 		/* We don't assign cltvs[n]: if we use it, order doesn't matter.
 		 * However, valgrind will warn us something wierd is happening

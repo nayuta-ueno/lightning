@@ -21,32 +21,48 @@ void bitcoin_tx_add_input(struct bitcoin_tx *tx,
 			  u8 *script)
 {
 	size_t i = tx->used_inputs;
+	struct wally_tx_input *inp;
 	assert(tx->used_inputs < tal_count(tx->input));
 	tx->input[i].txid = *txid;
 	tx->input[i].index = outnum;;
 	tx->input[i].amount = tal_dup(tx->input, struct amount_sat, &amount);
 	tx->input[i].sequence_number = sequence;
-	tx->input[i].script = script;
+	tx->input[i].script =
+	    tal_dup_arr(tx, u8, script, tal_bytelen(script), 0);
 
-	wally_tx_add_raw_input(tx->wtx, txid->shad.sha.u.u8,
-			       sizeof(struct bitcoin_txid), outnum, sequence,
-			       script, tal_bytelen(script),
-			       NULL /* empty witnesses */, 0);
+	wally_tx_input_init_alloc(txid->shad.sha.u.u8,
+				  sizeof(struct bitcoin_txid), outnum, sequence,
+				  script, tal_bytelen(script), NULL, &inp);
+	wally_tx_add_input(tx->wtx, inp);
+	//wally_tx_add_raw_input(tx->wtx, txid->shad.sha.u.u8,
+	//		       sizeof(struct bitcoin_txid), outnum, sequence,
+	//		       script, tal_bytelen(script),
+	//		       NULL /* empty witnesses */, 0);
 	tx->used_inputs++;
+	assert(tx->wtx->num_inputs == tx->used_inputs);
 }
 
-void bitcoin_tx_add_output(struct bitcoin_tx *tx, u8 *script,
+int bitcoin_tx_add_output(struct bitcoin_tx *tx, u8 *script,
 			   struct amount_sat amount)
 {
 	size_t i = tx->used_outputs;
+	//size_t script_len = tal_bytelen(script);
+	//u8 *script_dup = tal_dup_arr(tx, u8, script, script_len, 0);
 	assert(tx->used_outputs < tal_count(tx->output));
+	assert(tx->output[i].script == NULL);
 	tx->output[i].amount = amount;
 	tx->output[i].script = script;
+	struct wally_tx_output *out;
 
-	wally_tx_add_raw_output(tx->wtx, amount.satoshis, script,
-				tal_bytelen(script), 0);
+	wally_tx_output_init_alloc(amount.satoshis, script, tal_bytelen(script), &out);
+	wally_tx_add_output(tx->wtx, out);
+
+	//wally_tx_add_raw_output(tx->wtx, amount.satoshis, NULL,
+	//			0, 0);
 
 	tx->used_outputs++;
+	//assert(tx->wtx->num_outputs == tx->used_outputs);
+	return i;
 }
 
 static void push_tx_input(const struct bitcoin_tx_input *input,

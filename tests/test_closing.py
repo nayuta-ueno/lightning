@@ -1102,7 +1102,7 @@ def setup_multihtlc_test(node_factory, bitcoind):
 
 
 @unittest.skipIf(not DEVELOPER, "needs DEVELOPER=1 for dev_ignore_htlcs")
-@unittest.skipIf(SLOW_MACHINE and VALGRIND, "slow test")
+#@unittest.skipIf(SLOW_MACHINE and VALGRIND, "slow test")
 def test_onchain_multihtlc_our_unilateral(node_factory, bitcoind):
     """Node pushes a channel onchain with multiple HTLCs with same payment_hash """
     h, nodes = setup_multihtlc_test(node_factory, bitcoind)
@@ -1190,7 +1190,7 @@ def test_onchain_multihtlc_our_unilateral(node_factory, bitcoind):
 
 
 @unittest.skipIf(not DEVELOPER, "needs DEVELOPER=1 for dev_ignore_htlcs")
-@unittest.skipIf(SLOW_MACHINE and VALGRIND, "slow test")
+#@unittest.skipIf(SLOW_MACHINE and VALGRIND, "slow test")
 def test_onchain_multihtlc_their_unilateral(node_factory, bitcoind):
     """Node pushes a channel onchain with multiple HTLCs with same payment_hash """
     h, nodes = setup_multihtlc_test(node_factory, bitcoind)

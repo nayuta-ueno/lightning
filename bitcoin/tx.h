@@ -91,7 +91,7 @@ void bitcoin_tx_add_input(struct bitcoin_tx *tx,
 			  u32 sequence, const struct amount_sat amount,
 			  u8 *script);
 
-void bitcoin_tx_add_output(struct bitcoin_tx *tx, u8 *script,
-			   struct amount_sat amount);
+int bitcoin_tx_add_output(struct bitcoin_tx *tx, u8 *script,
+			  struct amount_sat amount);
 
 #endif /* LIGHTNING_BITCOIN_TX_H */

@@ -6,6 +6,7 @@
 #include <common/keyset.h>
 #include <common/permute_tx.h>
 #include <common/utils.h>
+#include <ccan/mem/mem.h>
 
 #ifndef SUPERVERBOSE
 #define SUPERVERBOSE(...)
@@ -92,7 +93,7 @@ static void add_received_htlc_out(struct bitcoin_tx *tx, size_t n,
 	p2wsh = scriptpubkey_p2wsh(tx->output, wscript);
 	bitcoin_tx_add_output(tx, p2wsh, amount);
 	SUPERVERBOSE("# HTLC %" PRIu64 " received %s wscript %s\n", htlc->id,
-		     type_to_string(tmpctx, struct amount_sat, amount),
+		     type_to_string(tmpctx, struct amount_sat, &amount),
 		     tal_hex(wscript, wscript));
 	tal_free(wscript);
 }
@@ -249,10 +250,14 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 		 * This output sends funds to the other peer and thus is a simple
 		 * P2WPKH to `remotepubkey`.
 		 */
+		assert(tx->used_outputs == n);
 		p2wpkh = scriptpubkey_p2wpkh(tx, &keyset->other_payment_key);
 		amount = amount_msat_to_sat_round_down(other_pay);
 		bitcoin_tx_add_output(tx, p2wpkh, amount);
+		tx->output[n].amount = amount;
+		tx->output[n].script = p2wpkh;
 		(*htlcmap)[n] = NULL;
+		assert(memeq(tx->output[n].script, tal_bytelen(tx->output[n].script), p2wpkh, tal_bytelen(p2wpkh)));
 		/* We don't assign cltvs[n]: if we use it, order doesn't matter.
 		 * However, valgrind will warn us something wierd is happening
 		 */
@@ -263,6 +268,7 @@ struct bitcoin_tx *commit_tx(const tal_t *ctx,
 					    &keyset->other_payment_key));
 		n++;
 	}
+	assert(n == tx->used_outputs);
 
 	assert(n <= tal_count(tx->output));
 	tal_resize(&tx->output, n);

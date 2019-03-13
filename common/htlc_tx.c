@@ -16,7 +16,7 @@ static struct bitcoin_tx *htlc_tx(const tal_t *ctx,
 {
 	struct bitcoin_tx *tx = bitcoin_tx(ctx, 1, 1);
 	u8 *wscript;
-	struct amount_sat amount;
+	struct amount_sat amount, out_amount;
 
 	/* BOLT #3:
 	 *
@@ -44,12 +44,13 @@ static struct bitcoin_tx *htlc_tx(const tal_t *ctx,
 	 *      `output_index` of the matching HTLC output for the HTLC
 	 *      transaction
 	 */
-	tx->input[0].txid = *commit_txid;
-	tx->input[0].index = commit_output_number;
+	//tx->input[0].txid = *commit_txid;
+	//tx->input[0].index = commit_output_number;
 
 	/* We need amount for signing. */
 	amount = amount_msat_to_sat_round_down(msat);
-	tx->input[0].amount = tal_dup(tx, struct amount_sat, &amount);
+	//tx->input[0].amount = tal_dup(tx, struct amount_sat, &amount);
+	bitcoin_tx_add_input(tx, commit_txid, commit_output_number, 0, amount, NULL);
 
 	/* BOLT #3:
 	 *    * `txin[0]` sequence: `0`
@@ -63,12 +64,12 @@ static struct bitcoin_tx *htlc_tx(const tal_t *ctx,
 	 *    * `txout[0]` script: version-0 P2WSH with witness script as shown
 	 *       below
 	 */
-	if (!amount_sat_sub(&tx->output[0].amount, amount, htlc_fee))
+	if (!amount_sat_sub(&out_amount, amount, htlc_fee))
 		abort();
 
 	wscript = bitcoin_wscript_htlc_tx(tx, to_self_delay,
 					  revocation_pubkey, local_delayedkey);
-	tx->output[0].script = scriptpubkey_p2wsh(tx, wscript);
+	bitcoin_tx_add_output(tx, scriptpubkey_p2wsh(tx, wscript), out_amount);
 	tal_free(wscript);
 
 	return tx;
@@ -116,6 +117,11 @@ void htlc_success_tx_add_witness(struct bitcoin_tx *htlc_success,
 						  localhtlcsig, remotehtlcsig,
 						  payment_preimage,
 						  wscript);
+	for (size_t i=0; i<tal_count(htlc_success->input[0].witness); i++)
+		wally_tx_witness_stack_set(
+		    htlc_success->wtx->inputs[0].witness, 0,
+		    htlc_success->input[0].witness[i],
+		    sizeof(htlc_success->input[0].witness[i]));
 	tal_free(wscript);
 }
 
@@ -156,6 +162,11 @@ void htlc_timeout_tx_add_witness(struct bitcoin_tx *htlc_timeout,
 		= bitcoin_witness_htlc_timeout_tx(htlc_timeout->input,
 						  localhtlcsig, remotehtlcsig,
 						  wscript);
+	for (size_t i=0; i<tal_count(htlc_timeout->input[0].witness); i++)
+		wally_tx_witness_stack_set(
+		    htlc_timeout->wtx->inputs[0].witness, 0,
+		    htlc_timeout->input[0].witness[i],
+		    sizeof(htlc_timeout->input[0].witness[i]));
 	tal_free(wscript);
 }
 

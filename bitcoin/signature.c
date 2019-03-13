@@ -101,6 +101,7 @@ static void sha256_tx_one_input(const struct bitcoin_tx *tx,
 			  sighash_type);
 }
 
+#include <stdio.h>
 void sign_tx_input(const struct bitcoin_tx *tx,
 		   unsigned int in,
 		   const u8 *subscript,
@@ -109,13 +110,36 @@ void sign_tx_input(const struct bitcoin_tx *tx,
 		   enum sighash_type sighash_type,
 		   struct bitcoin_signature *sig)
 {
-	struct sha256_double hash;
+	struct sha256_double hash, whash;
+	char *hextx;
+	int flags = witness_script != NULL ? WALLY_TX_FLAG_USE_WITNESS : 0;
+	const u8 *script =
+	    tal_bytelen(witness_script) > 0 ? witness_script : subscript;
 
 	assert(sighash_type_valid(sighash_type));
 	sig->sighash_type = sighash_type;
+	printf("subscript %zu: %s\n", tal_bytelen(subscript), tal_hex(tmpctx, subscript));
+	printf("witness_script %zu: %s\n", tal_bytelen(witness_script), tal_hex(tmpctx, witness_script));
+	wally_tx_get_btc_signature_hash(
+		tx->wtx, in, script,
+	    tal_bytelen(script), tx->input[in].amount->satoshis,
+	    sighash_type, flags, whash.sha.u.u8, sizeof(whash));
+
+	printf("SIGHASH TYPE %d %d\n", sighash_type, WALLY_SIGHASH_ALL);
+
 	sha256_tx_one_input(tx, in, subscript, witness_script,
 			    sighash_type, &hash);
 	dump_tx("Signing", tx, in, subscript, key, &hash);
+	wally_tx_to_hex(tx->wtx, WALLY_TX_FLAG_USE_WITNESS, &hextx);
+	printf("\n\nWTX %s\n\n", hextx);
+
+	printf("\n\nCTX %s\n\n", tal_hex(tmpctx, linearize_tx(tmpctx, tx)));
+
+	printf("WHEX %s\n", tal_hexstr(tmpctx, &whash, sizeof(whash)));
+	printf("CHEX %s\n", tal_hexstr(tmpctx, &hash, sizeof(hash)));
+
+	assert(memeq(&hash, sizeof(hash), &whash, sizeof(whash)));
+
 	sign_hash(privkey, &hash, &sig->s);
 }
 

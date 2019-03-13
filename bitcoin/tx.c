@@ -189,6 +189,7 @@ static void push_tx(const struct bitcoin_tx *tx,
 static void push_sha(const void *data, size_t len, void *shactx_)
 {
 	struct sha256_ctx *ctx = shactx_;
+	printf("%s", tal_hexstr(tmpctx, data, len));
 	sha256_update(ctx, memcheck(data, len), len);
 }
 
@@ -321,13 +322,17 @@ void sha256_tx_for_sig(struct sha256_double *h, const struct bitcoin_tx *tx,
 		assert(sighash_type == SIGHASH_ALL
 		       || sighash_type == (SIGHASH_SINGLE|SIGHASH_ANYONECANPAY));
 		/* BIP143 hashing if OP_CHECKSIG is inside witness. */
+		printf("Hash for segwit\n");
 		hash_for_segwit(&ctx, tx, input_num, witness_script,
 				sighash_type);
 	} else {
+		printf("Hash for normal\n");
 		/* Never implemented anything else for old scheme. */
 		assert(sighash_type == SIGHASH_ALL);
 		/* Otherwise signature hashing never includes witness. */
+		printf("CLI   SHA256 ");
 		push_tx(tx, script, input_num, push_sha, &ctx, false);
+		printf("\n");
 	}
 
 	sha256_le32(&ctx, sighash_type);

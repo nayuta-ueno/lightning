@@ -56,14 +56,23 @@ static struct secret secret_from_hex(const char *hex)
 	return s;
 }
 
+#include <ccan/mem/mem.h>
 static void tx_must_be_eq(const struct bitcoin_tx *a,
 			  const struct bitcoin_tx *b)
 {
 	u8 *lina, *linb;
+	u8 lina2[1024], linb2[1024];
 	size_t i;
+	size_t written;
 
 	lina = linearize_tx(tmpctx, a);
+	assert(wally_tx_to_bytes(a->wtx, WALLY_TX_FLAG_USE_WITNESS, lina2, sizeof(lina2), &written) == WALLY_OK);
+	assert(memeq(lina, tal_bytelen(lina), lina2, written));
 	linb = linearize_tx(tmpctx, b);
+	assert(wally_tx_to_bytes(a->wtx, WALLY_TX_FLAG_USE_WITNESS, linb2, sizeof(linb2), &written) == WALLY_OK);
+	assert(memeq(lina, tal_bytelen(linb), linb2, written));
+
+
 
 	for (i = 0; i < tal_count(lina); i++) {
 		if (i >= tal_count(linb))
@@ -341,6 +350,9 @@ static void report(struct bitcoin_tx *tx,
 						    &localsig, &remotesig,
 						    local_funding_pubkey,
 						    remote_funding_pubkey);
+//	tx->wtx->inputs[0]
+	for (size_t i=0; i<tal_count(tx->input[0].witness); i++)
+		wally_tx_witness_stack_add(tx->wtx->inputs[0].witness, tx->input[0].witness[i], tal_bytelen(tx->input[0].witness[i]));
 	txhex = tal_hex(tmpctx, linearize_tx(tx, tx));
 	printf("output commit_tx: %s\n", txhex);
 

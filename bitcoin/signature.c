@@ -109,17 +109,10 @@ void sign_tx_input(const struct bitcoin_tx *tx,
 		   enum sighash_type sighash_type,
 		   struct bitcoin_signature *sig)
 {
-	struct sha256_double hash, whash;
-	int flags = witness_script != NULL ? WALLY_TX_FLAG_USE_WITNESS : 0;
-	const u8 *script =
-	    tal_bytelen(witness_script) > 0 ? witness_script : subscript;
+	struct sha256_double hash;
 
 	assert(sighash_type_valid(sighash_type));
 	sig->sighash_type = sighash_type;
-	wally_tx_get_btc_signature_hash(
-		tx->wtx, in, script,
-	    tal_bytelen(script), tx->input[in].amount->satoshis,
-	    sighash_type, flags, whash.sha.u.u8, sizeof(whash));
 	sha256_tx_one_input(tx, in, subscript, witness_script,
 			    sighash_type, &hash);
 	dump_tx("Signing", tx, in, subscript, key, &hash);

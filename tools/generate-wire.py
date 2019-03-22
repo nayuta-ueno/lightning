@@ -308,7 +308,8 @@ class Message(object):
             return
         for f in self.fields:
             if f.name == field.lenvar:
-                if f.fieldtype.name != 'u16':
+                # We allow u32 lengths for internal messages
+                if f.fieldtype.name != 'u16' and f.fieldtype.name != 'u32':
                     raise ValueError('Field {} has non-u16 length variable {} (type {})'
                                      .format(field.name, field.lenvar, f.fieldtype.name))
 

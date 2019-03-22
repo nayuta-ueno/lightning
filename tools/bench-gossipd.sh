@@ -111,7 +111,7 @@ if [ -z "${TARGETS##* routing_sec *}" ]; then
     echo "$DIV" | tr -d \\n; DIV=","
     # shellcheck disable=SC2046
     # shellcheck disable=SC2005
-    echo $(grep nodeid "$DIR"/listnodes.json | cut -d'"' -f4 | sort | head -n2) | while read -r from to; do
+    echo $(tr '{}' '\n' < "$DIR"/listnodes.json | grep nodeid | cut -d'"' -f4 | sort | head -n2) | while read -r from to; do
 	# shellcheck disable=SC2086
 	/usr/bin/time --quiet -o "$DIR"/stats --append -f %e $LCLI1 getroute 2>&1 $from 1 1 6 $to > /dev/null || true # FIXME: this shouldn't fail
     done

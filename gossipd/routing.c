@@ -1889,7 +1889,6 @@ void memleak_remove_routing_tables(struct htable *memtable,
 
 	memleak_remove_htable(memtable, &rstate->nodes->raw);
 	memleak_remove_htable(memtable, &rstate->pending_node_map->raw);
-	memleak_remove_uintmap(memtable, &rstate->broadcasts->broadcasts);
 
 	for (n = node_map_first(rstate->nodes, &nit);
 	     n;

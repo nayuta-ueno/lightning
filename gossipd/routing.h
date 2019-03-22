@@ -42,7 +42,6 @@ struct half_chan {
 
 struct chan {
 	struct short_channel_id scid;
-	u8 *txout_script;
 
 	/*
 	 * half[0]->src == nodes[0] half[0]->dst == nodes[1]
@@ -54,9 +53,6 @@ struct chan {
 
 	/* Timestamp and index into store file */
 	struct broadcastable bcast;
-
-	/* Disabled locally (due to peer disconnect) */
-	bool local_disabled;
 
 	struct amount_sat sat;
 };
@@ -193,6 +189,9 @@ struct routing_state {
 
 	/* Has one of our own channels been announced? */
 	bool local_channel_announced;
+
+        /* A map of (local) disabled channels by short_channel_ids */
+	struct chan_map local_disabled_map;
 
 #if DEVELOPER
 	/* Override local time for gossip messages */
@@ -353,6 +352,28 @@ void memleak_remove_routing_tables(struct htable *memtable,
  * This gets overridden in dev mode so we can use canned (stale) gossip.
  */
 struct timeabs gossip_time_now(const struct routing_state *rstate);
+
+/* Because we can have millions of channels, and we only want a local_disable
+ * flag on ones connected to us, we keep a separate hashtable for that flag.
+ */
+static inline bool is_chan_local_disabled(struct routing_state *rstate,
+					  const struct chan *chan)
+{
+	return chan_map_get(&rstate->local_disabled_map, &chan->scid) != NULL;
+}
+
+static inline void local_disable_chan(struct routing_state *rstate,
+				      const struct chan *chan)
+{
+	if (!is_chan_local_disabled(rstate, chan))
+		chan_map_add(&rstate->local_disabled_map, chan);
+}
+
+static inline void local_enable_chan(struct routing_state *rstate,
+				     const struct chan *chan)
+{
+	chan_map_del(&rstate->local_disabled_map, chan);
+}
 
 /* Helper to convert on-wire addresses format to wireaddrs array */
 struct wireaddr *read_addresses(const tal_t *ctx, const u8 *ser);

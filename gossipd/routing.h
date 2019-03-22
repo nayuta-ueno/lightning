@@ -210,6 +210,11 @@ struct routing_state {
 
 	/* Has one of our own channels been announced? */
 	bool local_channel_announced;
+
+#if DEVELOPER
+	/* Override local time for gossip messages */
+	struct timeabs *gossip_time;
+#endif
 };
 
 static inline struct chan *
@@ -230,7 +235,8 @@ struct route_hop {
 struct routing_state *new_routing_state(const tal_t *ctx,
 					const struct chainparams *chainparams,
 					const struct pubkey *local_id,
-					u32 prune_timeout);
+					u32 prune_timeout,
+					const u32 *dev_gossip_time);
 
 /**
  * Add a new bidirectional channel from id1 to id2 with the given
@@ -341,4 +347,12 @@ bool handle_local_add_channel(struct routing_state *rstate, const u8 *msg);
 void memleak_remove_routing_tables(struct htable *memtable,
 				   const struct routing_state *rstate);
 #endif
+
+/**
+ * Get the local time.
+ *
+ * This gets overridden in dev mode so we can use canned (stale) gossip.
+ */
+struct timeabs gossip_time_now(const struct routing_state *rstate);
+
 #endif /* LIGHTNING_GOSSIPD_ROUTING_H */

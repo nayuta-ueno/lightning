@@ -386,8 +386,6 @@ static void init_half_chan(struct routing_state *rstate,
 {
 	struct half_chan *c = &chan->half[channel_idx];
 
-	c->channel_update = NULL;
-
 	/* Set the channel direction */
 	c->channel_flags = channel_idx;
 	// TODO: wireup message_flags
@@ -961,10 +959,20 @@ bool routing_add_channel_announcement(struct routing_state *rstate,
 	chan = get_channel(rstate, &scid);
 	if (chan) {
 		/* Steal any private updates */
-		private_updates[0] = tal_steal(NULL, chan->half[0].channel_update);
-		private_updates[1] = tal_steal(NULL, chan->half[1].channel_update);
 		private_update_index[0] = chan->half[0].bcast.index;
 		private_update_index[1] = chan->half[1].bcast.index;
+		if (private_update_index[0])
+			private_updates[0] = gossip_store_get(NULL,
+							      rstate->broadcasts->gs,
+							      private_update_index[0]);
+		else
+			private_updates[0] = NULL;
+		if (private_update_index[1])
+			private_updates[1] = gossip_store_get(NULL,
+							      rstate->broadcasts->gs,
+							      private_update_index[1]);
+		else
+			private_updates[1] = NULL;
 		/* Pretend it didn't exist, for the moment. */
 		tal_free(chan);
 	} else
@@ -1305,6 +1313,10 @@ bool routing_add_channel_update(struct routing_state *rstate,
 	u8 direction;
 	struct amount_sat sat;
 
+	/* In case it's free in a failure path */
+	if (taken(update))
+		tal_steal(tmpctx, update);
+
 	if (!fromwire_channel_update(update, &signature, &chain_hash,
 				     &short_channel_id, &timestamp,
 				     &message_flags, &channel_flags,
@@ -1363,18 +1375,6 @@ bool routing_add_channel_update(struct routing_state *rstate,
 	/* Discard older updates */
 	hc = &chan->half[direction];
 	if (is_halfchan_defined(hc) && timestamp <= hc->bcast.timestamp) {
-		/* They're not supposed to do this! */
-		if (timestamp == hc->bcast.timestamp
-		    && !memeq(hc->channel_update, tal_count(hc->channel_update),
-			      update, tal_count(update))) {
-			status_debug("Bad gossip repeated timestamp for %s(%u): %s then %s",
-				       type_to_string(tmpctx,
-						      struct short_channel_id,
-						      &short_channel_id),
-				       channel_flags,
-				       tal_hex(tmpctx, hc->channel_update),
-				       tal_hex(tmpctx, update));
-		}
 		SUPERVERBOSE("Ignoring outdated update.");
 		/* Ignoring != failing */
 		return true;
@@ -1391,14 +1391,8 @@ bool routing_add_channel_update(struct routing_state *rstate,
 			      message_flags, channel_flags,
 			      timestamp, htlc_minimum, htlc_maximum);
 
-	/* Replace any old one. */
-	tal_free(chan->half[direction].channel_update);
 	/* Safe even if was never added */
 	broadcast_del(rstate->broadcasts, &chan->half[direction].bcast);
-
-	chan->half[direction].channel_update
-		= tal_dup_arr(chan, u8, update, tal_count(update), 0);
-
 
 	/* BOLT #7:
 	 *   - MUST consider the `timestamp` of the `channel_announcement` to be
@@ -1419,7 +1413,7 @@ bool routing_add_channel_update(struct routing_state *rstate,
 		assert(is_local_channel(rstate, chan));
 		if (!index) {
 			hc->bcast.index = gossip_store_add(rstate->broadcasts->gs,
-							   hc->channel_update);
+							   update);
 		} else
 			hc->bcast.index = index;
 		return true;
@@ -1429,7 +1423,7 @@ bool routing_add_channel_update(struct routing_state *rstate,
 	chan->half[direction].bcast.index = index;
 
 	insert_broadcast(&rstate->broadcasts,
-			 chan->half[direction].channel_update,
+			 update,
 			 &chan->half[direction].bcast);
 
 	if (uc) {

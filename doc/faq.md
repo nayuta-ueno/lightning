@@ -22,7 +22,7 @@ A short-channel ID uniquely identifies a channel by the funding transaction's lo
 Once the funding transaction confirms on the blockchain we can identify the output that funded the channel, i.e., the funds that are allocated to the channel, by the blockchain height, the position of the transaction in that block, and the position of the output in the transaction.
 Those are also the the parts of the short-channel ID, separated by the character `x`.
 
-For example the short-channel ID `569010x2756x1`points to block [569010][block-569010], in which we want the transaction at position [2756][scid-569010x2756], and in that transaciton we point to output [1][scid-569010x2756x1] (notice that all of these indices are 0-based).
+For example the short-channel ID `569010x2756x1`points to block [569010][scid-569010], in which we want the transaction at position [2756][scid-569010x2756], and in that transaciton we point to output [1][scid-569010x2756x1] (notice that all of these indices are 0-based).
 
 In addition sometimes we may append a `/0` or `/1` to the short-channel ID to indicate the _direction_ in that channel.
 The direction determines in which direction we are traversing a channel, and is given by lexicographically comparing the node IDs or the channel endpoints.

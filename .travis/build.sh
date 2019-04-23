@@ -24,6 +24,8 @@ pip3 install --user --quiet -r tests/requirements.txt
 pip3 install --quiet \
      pytest-test-groups==1.0.3
 
+git submodule update # Make sure we don't compile with outdated dependencies
+
 echo "Configuration which is going to be built:"
 echo -en 'travis_fold:start:script.1\\r'
 ./configure CC="$CC"

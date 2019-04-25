@@ -697,7 +697,6 @@ class LightningNode(object):
 
         wait_for(lambda: txid in self.bitcoin.rpc.getrawmempool())
 
-
     def describe_graph(self, filename=None):
         """Describe the network view in the dot format
         """

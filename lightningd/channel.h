@@ -62,6 +62,11 @@ struct channel {
 	struct amount_sat funding;
 	struct amount_msat push;
 	bool remote_funding_locked;
+
+	/* channel announcement sigs info from remote peer*/
+	secp256k1_ecdsa_signature *remote_ann_node_sig;
+	secp256k1_ecdsa_signature *remote_ann_bitcoin_sig;
+
 	/* Channel if locked locally. */
 	struct short_channel_id *scid;
 
@@ -164,7 +169,9 @@ struct channel *new_channel(struct peer *peer, u64 dbid,
 			    u32 feerate_base,
 			    u32 feerate_ppm,
 			    /* NULL or stolen */
-			    const u8 *remote_upfront_shutdown_script);
+			    const u8 *remote_upfront_shutdown_script,
+				secp256k1_ecdsa_signature *remote_ann_node_sig,
+				secp256k1_ecdsa_signature *remote_ann_bitcoin_sig);
 
 void delete_channel(struct channel *channel);
 

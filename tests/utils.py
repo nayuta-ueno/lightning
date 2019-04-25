@@ -698,6 +698,30 @@ class LightningNode(object):
         wait_for(lambda: txid in self.bitcoin.rpc.getrawmempool())
 
 
+    def describe_graph(self, filename=None):
+        """Describe the network view in the dot format
+        """
+        edges = self.rpc.listchannels()['channels']
+        graph = ["digraph {"]
+        for e in edges:
+            graph.append('\t"{source}" -> "{destination}" [label="{scid}/{direction}" color="{color}"]'.format(
+                source=e['source'][:10],
+                destination=e['destination'][:10],
+                scid=e['short_channel_id'],
+                direction=e['channel_flags'] % 2,
+                color='green' if e['active'] else 'red'
+            ))
+        graph.append("}")
+        graph = "\n".join(graph)
+
+        if filename:
+            with open(filename, 'w') as f:
+                f.write(graph)
+
+        print(graph)
+        return graph
+
+
 class NodeFactory(object):
     """A factory to setup and start `lightningd` daemons.
     """

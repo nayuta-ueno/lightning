@@ -94,6 +94,11 @@ channel_fulfill_htlc,,fulfilled_htlc,struct fulfilled_htlc
 channel_fail_htlc,1006
 channel_fail_htlc,,failed_htlc,struct failed_htlc
 
+# When we receive announcement_signatures for channel announce
+channel_got_announcement,1017
+channel_got_announcement,,remote_ann_node_sig,secp256k1_ecdsa_signature
+channel_got_announcement,,remote_ann_bitcoin_sig,secp256k1_ecdsa_signature
+
 # When we receive funding_locked.
 channel_got_funding_locked,1019
 channel_got_funding_locked,,next_per_commit_point,struct pubkey

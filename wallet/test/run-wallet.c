@@ -915,12 +915,16 @@ static bool test_channel_crud(struct lightningd *ld, const tal_t *ctx)
 	struct changed_htlc *last_commit;
 	secp256k1_ecdsa_signature *sig = tal(w, secp256k1_ecdsa_signature);
 	u8 *scriptpubkey = tal_arr(ctx, u8, 100);
+	secp256k1_ecdsa_signature *node_sig = tal(w, secp256k1_ecdsa_signature);
+	secp256k1_ecdsa_signature *bitcoin_sig = tal(w, secp256k1_ecdsa_signature);
 
 	memset(&c1, 0, sizeof(c1));
 	memset(c2, 0, sizeof(*c2));
 	memset(ci, 3, sizeof(*ci));
 	mempat(hash, sizeof(*hash));
 	mempat(sig, sizeof(*sig));
+	mempat(node_sig, sizeof(*node_sig));
+	mempat(bitcoin_sig, sizeof(*bitcoin_sig));
 	last_commit = tal_arr(w, struct changed_htlc, 2);
 	mempat(last_commit, tal_bytelen(last_commit));
 	pubkey_from_der(tal_hexdata(w, "02a1633cafcc01ebfb6d78e39f687a1f0995c62fc95f51ead10a02ee0be551b5dc", 66), 33, &pk);
@@ -947,6 +951,8 @@ static bool test_channel_crud(struct lightningd *ld, const tal_t *ctx)
 	c1.last_tx = bitcoin_tx_from_hex(w, "02000000000101bef67e4e2fb9ddeeb3461973cd4c62abb35050b1add772995b820b584a488489000000000038b02b8003a00f0000000000002200208c48d15160397c9731df9bc3b236656efb6665fbfe92b4a6878e88a499f741c4c0c62d0000000000160014ccf1af2f2aabee14bb40fa3851ab2301de843110ae8f6a00000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e040047304402206a2679efa3c7aaffd2a447fd0df7aba8792858b589750f6a1203f9259173198a022008d52a0e77a99ab533c36206cb15ad7aeb2aa72b93d4b571e728cb5ec2f6fe260147304402206d6cb93969d39177a09d5d45b583f34966195b77c7e585cf47ac5cce0c90cefb022031d71ae4e33a4e80df7f981d696fbdee517337806a3c7138b7491e2cbb077a0e01475221023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb21030e9f7b623d2ccc7c9bd44d66d5ce21ce504c0acf6385a132cec6d3c39fa711c152ae3e195220", strlen("02000000000101bef67e4e2fb9ddeeb3461973cd4c62abb35050b1add772995b820b584a488489000000000038b02b8003a00f0000000000002200208c48d15160397c9731df9bc3b236656efb6665fbfe92b4a6878e88a499f741c4c0c62d0000000000160014ccf1af2f2aabee14bb40fa3851ab2301de843110ae8f6a00000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e040047304402206a2679efa3c7aaffd2a447fd0df7aba8792858b589750f6a1203f9259173198a022008d52a0e77a99ab533c36206cb15ad7aeb2aa72b93d4b571e728cb5ec2f6fe260147304402206d6cb93969d39177a09d5d45b583f34966195b77c7e585cf47ac5cce0c90cefb022031d71ae4e33a4e80df7f981d696fbdee517337806a3c7138b7491e2cbb077a0e01475221023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb21030e9f7b623d2ccc7c9bd44d66d5ce21ce504c0acf6385a132cec6d3c39fa711c152ae3e195220"));
 	c1.last_sig.s = *sig;
 	c1.last_sig.sighash_type = SIGHASH_ALL;
+	c1.remote_ann_node_sig = NULL;
+	c1.remote_ann_bitcoin_sig = NULL;
 
 	db_begin_transaction(w->db);
 	CHECK(!wallet_err);
@@ -968,9 +974,11 @@ static bool test_channel_crud(struct lightningd *ld, const tal_t *ctx)
 	CHECK(c1.peer->dbid == 1);
 	CHECK(c1.their_shachain.id == 1);
 
-	/* Variant 2: update with scid set */
-	c1.scid = talz(w, struct short_channel_id);
-	c1.last_was_revoke = !c1.last_was_revoke;
+	/* Variant 2: update with remote_ann sigs */
+	/* set flag of CHANNEL_FLAGS_ANNOUNCE_CHANNEL */
+	c1.channel_flags |= 1;
+	c1.remote_ann_node_sig = node_sig;
+	c1.remote_ann_bitcoin_sig = bitcoin_sig;
 	wallet_channel_save(w, &c1);
 	CHECK_MSG(!wallet_err,
 		  tal_fmt(w, "Insert into DB: %s", wallet_err));
@@ -985,18 +993,25 @@ static bool test_channel_crud(struct lightningd *ld, const tal_t *ctx)
 	CHECK(c1.peer->dbid == 1);
 	CHECK(c1.their_shachain.id == 1);
 
-	/* Variant 3: update with last_commit_sent */
-	c1.last_sent_commit = last_commit;
+	/* Variant 3: update with scid set */
+	c1.scid = talz(w, struct short_channel_id);
+	c1.last_was_revoke = !c1.last_was_revoke;
 	wallet_channel_save(w, &c1);
-	CHECK_MSG(!wallet_err, tal_fmt(w, "Insert into DB: %s", wallet_err));
+	CHECK_MSG(!wallet_err,
+		  tal_fmt(w, "Insert into DB: %s", wallet_err));
 	CHECK_MSG(c2 = wallet_channel_load(w, c1.dbid), tal_fmt(w, "Load from DB"));
 	CHECK_MSG(!wallet_err,
 		  tal_fmt(w, "Load from DB: %s", wallet_err));
 	CHECK_MSG(channelseq(&c1, c2), "Compare loaded with saved (v3)");
 	tal_free(c2);
 
-	/* Variant 4: update and add remote_shutdown_scriptpubkey */
-	c1.remote_shutdown_scriptpubkey = scriptpubkey;
+	/* Updates should not result in new ids */
+	CHECK(c1.dbid == 1);
+	CHECK(c1.peer->dbid == 1);
+	CHECK(c1.their_shachain.id == 1);
+
+	/* Variant 4: update with last_commit_sent */
+	c1.last_sent_commit = last_commit;
 	wallet_channel_save(w, &c1);
 	CHECK_MSG(!wallet_err, tal_fmt(w, "Insert into DB: %s", wallet_err));
 	CHECK_MSG(c2 = wallet_channel_load(w, c1.dbid), tal_fmt(w, "Load from DB"));
@@ -1004,6 +1019,26 @@ static bool test_channel_crud(struct lightningd *ld, const tal_t *ctx)
 		  tal_fmt(w, "Load from DB: %s", wallet_err));
 	CHECK_MSG(channelseq(&c1, c2), "Compare loaded with saved (v4)");
 	tal_free(c2);
+
+	/* Updates should not result in new ids */
+	CHECK(c1.dbid == 1);
+	CHECK(c1.peer->dbid == 1);
+	CHECK(c1.their_shachain.id == 1);
+
+	/* Variant 5: update and add remote_shutdown_scriptpubkey */
+	c1.remote_shutdown_scriptpubkey = scriptpubkey;
+	wallet_channel_save(w, &c1);
+	CHECK_MSG(!wallet_err, tal_fmt(w, "Insert into DB: %s", wallet_err));
+	CHECK_MSG(c2 = wallet_channel_load(w, c1.dbid), tal_fmt(w, "Load from DB"));
+	CHECK_MSG(!wallet_err,
+		  tal_fmt(w, "Load from DB: %s", wallet_err));
+	CHECK_MSG(channelseq(&c1, c2), "Compare loaded with saved (v5)");
+	tal_free(c2);
+
+	/* Updates should not result in new ids */
+	CHECK(c1.dbid == 1);
+	CHECK(c1.peer->dbid == 1);
+	CHECK(c1.their_shachain.id == 1);
 
 	db_commit_transaction(w->db);
 	CHECK(!wallet_err);

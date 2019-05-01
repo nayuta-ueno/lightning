@@ -376,12 +376,15 @@ static struct migration dbmigrations[] = {
 	{ "ALTER TABLE channels ADD feerate_base INTEGER;", NULL },
 	{ "ALTER TABLE channels ADD feerate_ppm INTEGER;", NULL },
 	{ NULL, migrate_pr2342_feerate_per_channel },
-	{ "ALTER TABLE channel_htlcs ADD received_time INTEGER", NULL },
-	{ "ALTER TABLE forwarded_payments ADD received_time INTEGER", NULL },
-	{ "ALTER TABLE forwarded_payments ADD resolved_time INTEGER", NULL },
+	{ "ALTER TABLE channel_htlcs ADD received_time INTEGER;", NULL },
+	{ "ALTER TABLE forwarded_payments ADD received_time INTEGER;", NULL },
+	{ "ALTER TABLE forwarded_payments ADD resolved_time INTEGER;", NULL },
 	{ "ALTER TABLE channels ADD remote_upfront_shutdown_script BLOB;", NULL },
 	/* PR #2524: Add failcode into forward_payment */
 	{ "ALTER TABLE forwarded_payments ADD failcode INTEGER;", NULL },
+	/* remote signatures for channel announcement */
+	{ "ALTER TABLE channels ADD remote_ann_node_sig BLOB;", NULL },
+	{ "ALTER TABLE channels ADD remote_ann_bitcoin_sig BLOB;", NULL },
 };
 
 /* Leak tracking. */

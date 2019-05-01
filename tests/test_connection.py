@@ -1515,30 +1515,15 @@ def test_restart_many_payments(node_factory):
         outchans.append(l1.fund_channel(n, 10**6, False))
 
     # Now do all the waiting at once: if !DEVELOPER, this can be *very* slow!
-    l1_logs = []
     for i in range(len(innodes)):
         scid = inchans[i]
-        l1_logs += [r'update for channel {}/0 now ACTIVE'.format(scid),
-                    r'update for channel {}/1 now ACTIVE'.format(scid),
-                    'to CHANNELD_NORMAL']
-        innodes[i].daemon.wait_for_logs([r'update for channel {}/0 now ACTIVE'
-                                         .format(scid),
-                                         r'update for channel {}/1 now ACTIVE'
-                                         .format(scid),
-                                         'to CHANNELD_NORMAL'])
+        innodes[i].wait_channel_active(scid)
+        l1.wait_channel_active(scid)
 
     for i in range(len(outnodes)):
         scid = outchans[i]
-        l1_logs += [r'update for channel {}/0 now ACTIVE'.format(scid),
-                    r'update for channel {}/1 now ACTIVE'.format(scid),
-                    'to CHANNELD_NORMAL']
-        outnodes[i].daemon.wait_for_logs([r'update for channel {}/0 now ACTIVE'
-                                          .format(scid),
-                                          r'update for channel {}/1 now ACTIVE'
-                                          .format(scid),
-                                          'to CHANNELD_NORMAL'])
-
-    l1.daemon.wait_for_logs(l1_logs)
+        outnodes[i].wait_channel_active(scid)
+        l1.wait_channel_active(scid)
 
     # Manually create routes, get invoices
     Payment = namedtuple('Payment', ['innode', 'route', 'payment_hash'])

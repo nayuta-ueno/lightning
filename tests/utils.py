@@ -549,16 +549,8 @@ class LightningNode(object):
         if wait_for_active:
             # We wait until gossipd sees both local updates, as well as status NORMAL,
             # so it can definitely route through.
-            self.daemon.wait_for_logs([r'update for channel {}/0 now ACTIVE'
-                                       .format(scid),
-                                       r'update for channel {}/1 now ACTIVE'
-                                       .format(scid),
-                                       'to CHANNELD_NORMAL'])
-            l2.daemon.wait_for_logs([r'update for channel {}/0 now ACTIVE'
-                                     .format(scid),
-                                     r'update for channel {}/1 now ACTIVE'
-                                     .format(scid),
-                                     'to CHANNELD_NORMAL'])
+            self.wait_channel_active(scid)
+            l2.wait_channel_active(scid)
         return scid
 
     def subd_pid(self, subd):
@@ -862,7 +854,7 @@ class NodeFactory(object):
         for src, dst in connections:
             wait_for(lambda: src.channel_state(dst) == 'CHANNELD_NORMAL')
             scid = src.get_channel_scid(dst)
-            src.daemon.wait_for_log(r'Received channel_update for channel {scid}/. now ACTIVE'.format(scid=scid))
+            src.wait_channel_active(scid)
             scids.append(scid)
 
         if not wait_for_announce:

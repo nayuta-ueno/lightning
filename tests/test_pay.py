@@ -214,7 +214,7 @@ def test_pay_get_error_with_update(node_factory):
     l1.daemon.wait_for_log(r'Extracted channel_update 0102.*from onionreply 10070088[0-9a-fA-F]{88}')
 
     # And now monitor for l1 to apply the channel_update we just extracted
-    l1.daemon.wait_for_log(r'Received channel_update for channel {}/. now DISABLED \(from error\)'.format(chanid2))
+    wait_for(lambda: [c['active'] for c in l1.rpc.listchannels(chanid2)['channels']] == [False, False])
 
 
 def test_pay_optional_args(node_factory):
@@ -1261,15 +1261,9 @@ def test_pay_routeboost(node_factory, bitcoind):
 
     # Make sure l1 knows about the 2->3 channel.
     bitcoind.generate_block(5)
-    l1.daemon.wait_for_logs([r'update for channel {}/0 now ACTIVE'
-                             .format(scidl2l3),
-                             r'update for channel {}/1 now ACTIVE'
-                             .format(scidl2l3)])
+    l1.wait_channel_active(scid)
     # Make sure l4 knows about 2->3 channel too so it's not a dead-end.
-    l4.daemon.wait_for_logs([r'update for channel {}/0 now ACTIVE'
-                             .format(scidl2l3),
-                             r'update for channel {}/1 now ACTIVE'
-                             .format(scidl2l3)])
+    l4.wait_channel_active(scidl2l3)
 
     # Get an l4 invoice; it should put the private channel in routeboost.
     inv = l4.rpc.invoice(10**5, 'test_pay_routeboost', 'test_pay_routeboost',
@@ -1409,7 +1403,8 @@ def test_pay_direct(node_factory, bitcoind):
     # Make sure l0 knows the l2->l3 channel.
     # Without DEVELOPER, channel lockin can take 30 seconds to detect,
     # and gossip 2 minutes to propagate
-    l0.wait_for_channel_updates([c0, c1, c2, c3])
+    for c in [c0, c1, c2, c3]:
+        l0.wait_channel_active(c0)
 
     # Find out how much msatoshi l1 owns on l1->l2 channel.
     l1l2msatreference = only_one(l1.rpc.getpeer(l2.info['id'])['channels'])['msatoshi_to_us']

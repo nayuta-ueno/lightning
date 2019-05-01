@@ -224,8 +224,9 @@ def test_closing_different_fees(node_factory, bitcoind, executor):
     bitcoind.generate_block(6)
 
     # Now wait for them all to hit normal state, do payments
-    l1.daemon.wait_for_logs(['update for channel .* now ACTIVE'] * num_peers
-                            + ['to CHANNELD_NORMAL'] * num_peers)
+    for p in peers:
+        wait_for(lambda: len([c for c in l1.rpc.listchannels()['channels'] if c['active']]) == 2 * num_peers)
+
     for p in peers:
         if p.amount != 0:
             l1.pay(p, 100000000)

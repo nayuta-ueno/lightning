@@ -151,7 +151,7 @@ def test_gossip_timestamp_filter(node_factory, bitcoind):
     chan12 = l1.fund_channel(l2, 10**5)
     bitcoind.generate_block(5)
 
-    l3.wait_for_channel_updates([chan12])
+    l3.wait_channel_active(chan12)
     after_12 = int(time.time())
     # Full IO logging for l1's channeld
     subprocess.run(['kill', '-USR1', l1.subd_pid('channeld')])
@@ -160,7 +160,7 @@ def test_gossip_timestamp_filter(node_factory, bitcoind):
     chan23 = l2.fund_channel(l3, 10**5)
     bitcoind.generate_block(5)
 
-    l1.wait_for_channel_updates([chan23])
+    l1.wait_channel_active(chan23)
     after_23 = int(time.time())
 
     # Make sure l1 has received all the gossip.
@@ -1007,10 +1007,7 @@ def test_getroute_exclude(node_factory, bitcoind):
     bitcoind.generate_block(5)
 
     # We don't wait above, because we care about it hitting l1.
-    l1.daemon.wait_for_logs([r'update for channel {}/0 now ACTIVE'
-                             .format(scid),
-                             r'update for channel {}/1 now ACTIVE'
-                             .format(scid)])
+    l1.wait_channel_active(scid)
 
     # l3 id is > l2 id, so 1 means l3->l2
     # chan_l3l2 = route[1]['channel'] + '/1'

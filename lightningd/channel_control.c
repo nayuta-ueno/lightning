@@ -116,6 +116,38 @@ static void peer_got_funding_locked(struct channel *channel, const u8 *msg)
 		lockin_complete(channel);
 }
 
+static void peer_got_announcement(struct channel *channel, const u8 *msg)
+{
+	secp256k1_ecdsa_signature *remote_ann_node_sig;
+	secp256k1_ecdsa_signature *remote_ann_bitcoin_sig;
+
+	remote_ann_node_sig = tal(tmpctx, secp256k1_ecdsa_signature);
+	remote_ann_bitcoin_sig = tal(tmpctx, secp256k1_ecdsa_signature);
+
+	if(!(channel->channel_flags & CHANNEL_FLAGS_ANNOUNCE_CHANNEL)) {
+		channel_internal_error(channel,
+				       "No ANNOUNCE flag, no announcemnt signatures! %s",
+				       tal_hex(tmpctx, msg));
+	}
+
+	if (!fromwire_channel_got_announcement(msg,
+					       remote_ann_node_sig,
+					       remote_ann_bitcoin_sig)) {
+		channel_internal_error(channel,
+				       "bad channel_got_funding_locked %s",
+				       tal_hex(tmpctx, msg));
+		return;
+	}
+
+	channel->remote_ann_node_sig
+			    = tal_steal(channel, remote_ann_node_sig);
+	channel->remote_ann_bitcoin_sig
+			    = tal_steal(channel, remote_ann_bitcoin_sig);
+
+	/* save remote peer announcement signatures into DB! */
+	wallet_announcement_save(channel->peer->ld->wallet, channel);
+}
+
 static void peer_got_shutdown(struct channel *channel, const u8 *msg)
 {
 	u8 *scriptpubkey;
@@ -214,6 +246,9 @@ static unsigned channel_msg(struct subd *sd, const u8 *msg, const int *fds)
 		break;
 	case WIRE_CHANNEL_GOT_FUNDING_LOCKED:
 		peer_got_funding_locked(sd->channel, msg);
+		break;
+	case WIRE_CHANNEL_GOT_ANNOUNCEMENT:
+		peer_got_announcement(sd->channel, msg);
 		break;
 	case WIRE_CHANNEL_GOT_SHUTDOWN:
 		peer_got_shutdown(sd->channel, msg);

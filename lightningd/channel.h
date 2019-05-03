@@ -170,8 +170,8 @@ struct channel *new_channel(struct peer *peer, u64 dbid,
 			    u32 feerate_ppm,
 			    /* NULL or stolen */
 			    const u8 *remote_upfront_shutdown_script,
-				secp256k1_ecdsa_signature *remote_ann_node_sig,
-				secp256k1_ecdsa_signature *remote_ann_bitcoin_sig);
+			    secp256k1_ecdsa_signature *remote_ann_node_sig,
+			    secp256k1_ecdsa_signature *remote_ann_bitcoin_sig);
 
 void delete_channel(struct channel *channel);
 

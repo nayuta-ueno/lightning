@@ -163,8 +163,9 @@ struct peer {
 
 	/* Empty commitments.  Spec violation, but a minor one. */
 	u64 last_empty_commitment;
-	/* It means if we are in reconnection process*/
-	bool reconnected;
+
+	/* It means if we have stored announcement signatures so far*/
+	bool remote_ann_stored;
 };
 
 static u8 *create_channel_announcement(const tal_t *ctx, struct peer *peer);
@@ -510,7 +511,7 @@ static void channel_announcement_negotiate(struct peer *peer)
 		 * announcement to MASTER.
 		 * But we won't do this when restart, because we load announcement
 		 * signatures form DB when we reenable Channeld! */
-		if(peer->reconnected == false){
+		if(peer->remote_ann_stored == false){
 			/* Ask Master to save remote announcement into DB.
 			 * We will never waste time on waiting for remote peer announcement
 			 * reply when restart.
@@ -519,6 +520,7 @@ static void channel_announcement_negotiate(struct peer *peer)
 					take(towire_channel_got_announcement(NULL,
 								&peer->announcement_node_sigs[REMOTE],
 								&peer->announcement_bitcoin_sigs[REMOTE])));
+			peer->remote_ann_stored = true;
 		}
 		announce_channel(peer);
 	}
@@ -2869,12 +2871,14 @@ static void init_channel(struct peer *peer)
 	struct failed_htlc **failed;
 	enum side *failed_sides;
 	struct added_htlc *htlcs;
-	bool reconnected;
 	u8 *funding_signed;
 	const u8 *msg;
 	u32 feerate_per_kw[NUM_SIDES];
 	u32 minimum_depth;
 	struct secret last_remote_per_commit_secret;
+	secp256k1_ecdsa_signature *remote_ann_node_sig;
+	secp256k1_ecdsa_signature *remote_ann_bitcoin_sig;
+	bool reconnected;
 
 	assert(!(fcntl(MASTER_FD, F_GETFL) & O_NONBLOCK));
 
@@ -2920,6 +2924,8 @@ static void init_channel(struct peer *peer)
 				   &peer->funding_locked[LOCAL],
 				   &peer->funding_locked[REMOTE],
 				   &peer->short_channel_ids[LOCAL],
+				   &remote_ann_node_sig,
+				   &remote_ann_bitcoin_sig,
 				   &reconnected,
 				   &peer->send_shutdown,
 				   &peer->shutdown_sent[REMOTE],
@@ -2947,6 +2953,21 @@ static void init_channel(struct peer *peer)
 		     peer->revocations_received,
 		     feerate_per_kw[LOCAL], feerate_per_kw[REMOTE],
 		     peer->feerate_min, peer->feerate_max);
+
+	if(remote_ann_node_sig && remote_ann_bitcoin_sig) {
+		peer->announcement_node_sigs[REMOTE] = *remote_ann_node_sig;
+		peer->announcement_bitcoin_sigs[REMOTE] = *remote_ann_bitcoin_sig;
+		peer->have_sigs[REMOTE] = true;
+		peer->remote_ann_stored = true;
+
+		tal_steal(tmpctx, remote_ann_node_sig);
+		tal_steal(tmpctx, remote_ann_bitcoin_sig);
+		/* Before we store announcement into DB, we have made sure
+		 * remote short_channel_id matched the local. Now we initial
+		 * it directly!
+		 */
+		peer->short_channel_ids[REMOTE] = peer->short_channel_ids[LOCAL];
+	}
 
 	/* First commit is used for opening: if we've sent 0, we're on
 	 * index 1. */
@@ -3051,6 +3072,7 @@ int main(int argc, char *argv[])
 	/* We actually received it in the previous daemon, but near enough */
 	peer->last_recv = time_now();
 	peer->last_empty_commitment = 0;
+	peer->remote_ann_stored = false;
 
 	/* We send these to HSM to get real signatures; don't have valgrind
 	 * complain. */

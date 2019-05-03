@@ -175,8 +175,8 @@ struct channel *new_channel(struct peer *peer, u64 dbid,
 			    u32 feerate_base,
 			    u32 feerate_ppm,
 			    const u8 *remote_upfront_shutdown_script,
-				secp256k1_ecdsa_signature *remote_ann_node_sig,
-				secp256k1_ecdsa_signature *remote_ann_bitcoin_sig)
+			    secp256k1_ecdsa_signature *remote_ann_node_sig,
+			    secp256k1_ecdsa_signature *remote_ann_bitcoin_sig)
 {
 	struct channel *channel = tal(peer->ld, struct channel);
 

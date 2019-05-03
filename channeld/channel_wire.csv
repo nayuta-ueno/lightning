@@ -50,6 +50,8 @@ channel_init,,failed_sides,num_failed*enum side
 channel_init,,local_funding_locked,bool
 channel_init,,remote_funding_locked,bool
 channel_init,,funding_short_id,struct short_channel_id
+channel_init,,remote_ann_node_sig,?secp256k1_ecdsa_signature
+channel_init,,remote_ann_bitcoin_sig,?secp256k1_ecdsa_signature
 channel_init,,reestablish,bool
 channel_init,,send_shutdown,bool
 channel_init,,remote_shutdown_received,bool

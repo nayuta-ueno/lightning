@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - plugin: the `connected` hook can now send an `error_message` to the rejected peer.
 - Protocol: we now enforce `option_upfront_shutdown_script` if a peer negotiates it.
 - JSON API: `listforwards` now includes the local_failed forwards with failcode (Issue [#2435](https://github.com/ElementsProject/lightning/issues/2435), PR [#2524](https://github.com/ElementsProject/lightning/pull/2524))
+- DB: Store the signatures of channel announcement sent from remote peer into DB, and init channel with signatures from DB directly when reenable the channel.
+(Issue [#2409](https://github.com/ElementsProject/lightning/issues/2409))
 
 ### Changed
 

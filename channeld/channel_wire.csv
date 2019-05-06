@@ -101,6 +101,9 @@ channel_got_announcement,1017
 channel_got_announcement,,remote_ann_node_sig,secp256k1_ecdsa_signature
 channel_got_announcement,,remote_ann_bitcoin_sig,secp256k1_ecdsa_signature
 
+# Wait for reply, to make sure it's on disk.(We store the announcement only once!)
+channel_got_announcement_reply,1117
+
 # When we receive funding_locked.
 channel_got_funding_locked,1019
 channel_got_funding_locked,,next_per_commit_point,struct pubkey

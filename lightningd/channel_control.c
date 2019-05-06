@@ -139,6 +139,12 @@ static void peer_got_announcement(struct channel *channel, const u8 *msg)
 		return;
 	}
 
+	/* To handle the case that Master was shut down before sends reply.
+	 * In this case, master may receive announcement more than once!
+	 */
+	tal_free(channel->remote_ann_node_sig);
+	tal_free(channel->remote_ann_bitcoin_sig);
+
 	channel->remote_ann_node_sig
 			    = tal_steal(channel, remote_ann_node_sig);
 	channel->remote_ann_bitcoin_sig
@@ -146,6 +152,8 @@ static void peer_got_announcement(struct channel *channel, const u8 *msg)
 
 	/* save remote peer announcement signatures into DB! */
 	wallet_announcement_save(channel->peer->ld->wallet, channel);
+	subd_send_msg(channel->owner,
+		      take(towire_channel_got_announcement_reply(msg)));
 }
 
 static void peer_got_shutdown(struct channel *channel, const u8 *msg)
@@ -281,6 +289,7 @@ static unsigned channel_msg(struct subd *sd, const u8 *msg, const int *fds)
 	case WIRE_CHANNEL_OFFER_HTLC_REPLY:
 	case WIRE_CHANNEL_DEV_REENABLE_COMMIT_REPLY:
 	case WIRE_CHANNEL_DEV_MEMLEAK_REPLY:
+	case WIRE_CHANNEL_GOT_ANNOUNCEMENT_REPLY:
 		break;
 	}
 

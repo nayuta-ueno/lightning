@@ -1636,7 +1636,7 @@ def test_pay_direct(node_factory, bitcoind):
     # Try multiple times to ensure that route randomization
     # will not override our preference for direct route.
     for i in range(8):
-        print(l0.rpc.getroute(l3.info['id'], 20000000, 1))
+        print('ROUTE', l0.rpc.getroute(l3.info['id'], 20000000, 1))
         inv = l3.rpc.invoice(20000000, 'pay{}'.format(i), 'desc')['bolt11']
 
         l0.rpc.pay(inv)

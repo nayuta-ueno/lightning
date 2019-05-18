@@ -1633,11 +1633,10 @@ def test_pay_direct(node_factory, bitcoind):
     # Find out how much msatoshi l1 owns on l1->l2 channel.
     l1l2msatreference = only_one(l1.rpc.getpeer(l2.info['id'])['channels'])['msatoshi_to_us']
 
-    l0.describe_graph(filename='l0-describe.dot')
-
     # Try multiple times to ensure that route randomization
     # will not override our preference for direct route.
     for i in range(8):
+        l0.describe_graph(filename='l0-describe.dot')
         print('ROUTE', l0.rpc.getroute(l3.info['id'], 20000000, 1))
         inv = l3.rpc.invoice(20000000, 'pay{}'.format(i), 'desc')['bolt11']
 

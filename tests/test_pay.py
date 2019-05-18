@@ -1642,11 +1642,11 @@ def test_pay_direct(node_factory, bitcoind):
 
         l0.rpc.pay(inv)
 
-        # We should have gone the direct route, so
-        # l1->l2 channel msatoshi_to_us should not
-        # have changed.
-        l1l2msat = only_one(l1.rpc.getpeer(l2.info['id'])['channels'])['msatoshi_to_us']
-        assert l1l2msat == l1l2msatreference
+    # We should have gone the direct route, so
+    # l1->l2 channel msatoshi_to_us should not
+    # have changed.
+    l1l2msat = only_one(l1.rpc.getpeer(l2.info['id'])['channels'])['msatoshi_to_us']
+    assert l1l2msat == l1l2msatreference
 
 
 def test_setchannelfee_usage(node_factory, bitcoind):

@@ -432,7 +432,7 @@ static bool sphinx_write_frame(u8 *dest, const struct sphinx_hop *hop)
 #endif
 
 	memset(dest, 0, num_frames * FRAME_SIZE);
-	dest[0] = hop->realm | (num_frames-1) << 4;
+	dest[0] = hop->realm | (num_frames-1) << 3;
 	memcpy(dest + 1, hop->payload, tal_bytelen(hop->payload));
 	memcpy(dest + (sphinx_hop_count_frames(hop) * FRAME_SIZE) - HMAC_SIZE,
 	       hop->hmac, HMAC_SIZE);

@@ -578,11 +578,12 @@ static struct command_result *wait_payment(struct lightningd *ld,
 	abort();
 }
 
+#include <ccan/mem/mem.h>
 /* Returns command_result if cmd was resolved, NULL if not yet called. */
 static struct command_result *
 send_payment(struct lightningd *ld,
 	     struct command *cmd,
-	     const struct sha256 *rhash,
+	     struct sha256 *rhash,
 	     const struct route_hop *route,
 	     struct amount_msat msat,
 	     const char *label TAKES,
@@ -682,6 +683,19 @@ send_payment(struct lightningd *ld,
 	}
 
 	randombytes_buf(&sessionkey, sizeof(sessionkey));
+
+	if (memeqzero(rhash, sizeof(*rhash))) {
+		printf("Spontaneous send, generating payment_hash\n");
+		struct hop_params *hop_params = generate_hop_params(tmpctx, sessionkey, path);
+		struct hop_params last = hop_params[tal_count(hop_params)-1];
+
+		printf("Shared secret with last hop %s\n", tal_hexstr(tmpctx, &last.secret, SHARED_SECRET_SIZE));
+
+		sha256(rhash, &last.secret, SHARED_SECRET_SIZE);
+		printf("Payment preimage %s\n", type_to_string(tmpctx, struct sha256, rhash));
+		sha256(rhash, rhash, SHARED_SECRET_SIZE);
+		printf("Payment_hash %s\n", type_to_string(tmpctx, struct sha256, rhash));
+	}
 
 	/* Onion will carry us from first peer onwards. */
 	packet = create_onionpacket(tmpctx, path, hop_data, sessionkey, rhash->u.u8,

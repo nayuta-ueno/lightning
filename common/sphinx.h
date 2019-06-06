@@ -198,4 +198,21 @@ struct onionreply *unwrap_onionreply(const tal_t *ctx,
 				     const struct secret *shared_secrets,
 				     const int numhops, const u8 *reply);
 
+
+#define BLINDING_FACTOR_SIZE 32
+#define SHARED_SECRET_SIZE 32
+#define HMAC_SIZE 32
+
+
+struct hop_params {
+	u8 secret[SHARED_SECRET_SIZE];
+	u8 blind[BLINDING_FACTOR_SIZE];
+	struct pubkey ephemeralkey;
+};
+
+struct hop_params *generate_hop_params(
+	const tal_t *ctx,
+	const u8 *sessionkey,
+	struct pubkey path[]);
+
 #endif /* LIGHTNING_COMMON_SPHINX_H */

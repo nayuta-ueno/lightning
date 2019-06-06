@@ -418,3 +418,26 @@ def test_htlc_accepted_hook_forward_restart(node_factory, executor):
     l2.restart()
 
     f1.result()
+
+
+def test_stepan_pay(node_factory):
+    l1, l2 = node_factory.line_graph(2, fundchannel=True, opts=[
+        {},
+        {'plugin': 'tests/plugins/stepan_pay.py'}
+    ])
+
+    route = l1.rpc.getroute(l2.info['id'], 1000, 1)['route']
+    rhash = '00'*32
+
+    print(route, rhash)
+
+    l1.rpc.sendpay(route, rhash)
+
+    #l1.rpc.waitsendpay(rhash)
+
+    time.sleep(3)
+    a = l1.daemon.is_in_log(r'Payment_hash [a-f0-9]{64}')
+
+    payment_hash = a[-65:-1]
+    print("PAyment key {}".format(payment_hash))
+    l1.rpc.waitsendpay(payment_hash)

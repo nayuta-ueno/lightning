@@ -22,12 +22,6 @@
 #define KEY_LEN 32
 #define ONION_REPLY_SIZE 256
 
-struct hop_params {
-	u8 secret[SHARED_SECRET_SIZE];
-	u8 blind[BLINDING_FACTOR_SIZE];
-	struct pubkey ephemeralkey;
-};
-
 struct keyset {
 	u8 pi[KEY_LEN];
 	u8 mu[KEY_LEN];
@@ -241,7 +235,7 @@ static void generate_key_set(const u8 secret[SHARED_SECRET_SIZE],
 	generate_key(keys->gamma, "gamma", 5, secret);
 }
 
-static struct hop_params *generate_hop_params(
+struct hop_params *generate_hop_params(
 	const tal_t *ctx,
 	const u8 *sessionkey,
 	struct pubkey path[])

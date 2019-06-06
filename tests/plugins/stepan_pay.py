@@ -9,17 +9,13 @@ plugin = Plugin()
 
 @plugin.hook("htlc_accepted")
 def on_htlc_accepted(onion, htlc, plugin):
-    print("Stepan", htlc, onion)
-
     ss = onion['shared_secret']
-    print("Shared_secret", ss)
     preimage = sha256(unhexlify(ss)).hexdigest()
+    payment_hash = sha256(unhexlify(preimage)).hexdigest()
+    assert payment_hash == htlc['payment_hash']
 
-    print("Preimage", preimage)
+    return {"result": "resolve", "payment_key": preimage}
 
-    res = {"result": "resolve", "payment_key": preimage}
-    print(res)
-    return res
 
 
 plugin.run()

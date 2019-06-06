@@ -1,4 +1,5 @@
 #include "pay.h"
+#include <ccan/mem/mem.h>
 #include <ccan/str/hex/hex.h>
 #include <ccan/tal/str/str.h>
 #include <common/bolt11.h>
@@ -578,7 +579,6 @@ static struct command_result *wait_payment(struct lightningd *ld,
 	abort();
 }
 
-#include <ccan/mem/mem.h>
 /* Returns command_result if cmd was resolved, NULL if not yet called. */
 static struct command_result *
 send_payment(struct lightningd *ld,
@@ -604,6 +604,8 @@ send_payment(struct lightningd *ld,
 	struct short_channel_id *channels;
 	struct routing_failure *fail;
 	struct channel *channel;
+	struct hop_params *hop_params;
+	struct hop_params last;
 
 	/* Expiry for HTLCs is absolute.  And add one to give some margin. */
 	base_expiry = get_block_height(ld->topology) + 1;
@@ -684,17 +686,17 @@ send_payment(struct lightningd *ld,
 
 	randombytes_buf(&sessionkey, sizeof(sessionkey));
 
+	/* If the payment_hash from the JSON-RPC is all zeros, we generate a
+	 * new one from the shared-secred based on the sessionkey. */
 	if (memeqzero(rhash, sizeof(*rhash))) {
-		printf("Spontaneous send, generating payment_hash\n");
-		struct hop_params *hop_params = generate_hop_params(tmpctx, sessionkey, path);
-		struct hop_params last = hop_params[tal_count(hop_params)-1];
+		hop_params = generate_hop_params(tmpctx, sessionkey, path);
+		last = hop_params[tal_count(hop_params)-1];
 
-		printf("Shared secret with last hop %s\n", tal_hexstr(tmpctx, &last.secret, SHARED_SECRET_SIZE));
-
+		/* Hash once to break any leakage from reusing the secret for
+		 * something other than generating the obfuscation stream */
 		sha256(rhash, &last.secret, SHARED_SECRET_SIZE);
-		printf("Payment preimage %s\n", type_to_string(tmpctx, struct sha256, rhash));
+		/* Hash a second time so we get the payment_hash */
 		sha256(rhash, rhash, SHARED_SECRET_SIZE);
-		printf("Payment_hash %s\n", type_to_string(tmpctx, struct sha256, rhash));
 	}
 
 	/* Onion will carry us from first peer onwards. */

@@ -622,7 +622,6 @@ struct htlc_accepted_hook_payload {
 	struct htlc_in *hin;
 	struct channel *channel;
 	struct lightningd *ld;
-	struct secret secret;
 	u8 *next_onion;
 };
 
@@ -902,7 +901,6 @@ static bool peer_accepted_htlc(struct channel *channel, u64 id,
 	hook_payload->ld = ld;
 	hook_payload->hin = hin;
 	hook_payload->channel = channel;
-	hook_payload->secret = *hin->shared_secret;
 	hook_payload->next_onion = serialize_onionpacket(hook_payload, rs->next);
 
 	plugin_hook_call_htlc_accepted(ld, hook_payload, hook_payload);

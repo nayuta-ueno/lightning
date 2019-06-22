@@ -728,6 +728,8 @@ static void htlc_accepted_hook_serialize(struct htlc_accepted_hook_payload *p,
 	json_add_u32(s, "cltv_expiry", expiry);
 	json_add_s32(s, "cltv_expiry_relative", expiry - blockheight);
 	json_add_hex(s, "payment_hash", hin->payment_hash.u.u8, sizeof(hin->payment_hash));
+	json_add_hex(s, "peer", &hin->key.channel->peer->id.k, 33);
+	json_add_short_channel_id(s, "scid", hin->key.channel->scid);
 	json_object_end(s);
 }
 

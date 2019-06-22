@@ -392,6 +392,18 @@ static struct migration dbmigrations[] = {
 	 * in the list view anyway, e.g., show all close and htlc transactions
 	 * as a single bundle. */
 	{ "ALTER TABLE transactions ADD channel_id INTEGER;", NULL},
+	{ "CREATE TABLE transaction_outputs ("
+	  "  txid BLOB REFERENCES transactions(id) ON DELETE CASCADE"
+	  ", outnum INTEGER"
+	  ", type INTEGER"
+	  ", channel_id INTEGER"
+	  ");", NULL},
+	{ "CREATE TABLE transaction_inputs ("
+	  "  txid BLOB REFERENCES transactions(id) ON DELETE CASCADE"
+	  ", innum INTEGER"
+	  ", type INTEGER"
+	  ", channel_id INTEGER"
+	  ");", NULL},
 };
 
 /* Leak tracking. */

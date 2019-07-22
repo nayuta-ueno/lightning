@@ -454,9 +454,6 @@ static bool compose_and_broadcast_tx(struct lightningd *ld,
 		fatal("HSM gave bad sign_funding_reply %s",
 		      tal_hex(msg, resp));
 
-	/* Extract the change output and add it to the DB */
-	wallet_extract_owned_outputs(ld->wallet, fundingtx, NULL, &change);
-
 	/* Make sure we recognize our change output by its scriptpubkey in
 	 * future. This assumes that we have only two outputs, may not be true
 	 * if we add support for multifundchannel */
@@ -469,8 +466,11 @@ static bool compose_and_broadcast_tx(struct lightningd *ld,
 
 	/* Mark consumed outputs as spent */
 	wallet_confirm_utxos(ld->wallet, fc->wtx->utxos);
-	wallet_transaction_annotate(ld->wallet, &funding_txid,
-				    TX_CHANNEL_FUNDING, channel->dbid);
+	/* Extract the change output and add it to the DB */
+	wallet_extract_owned_outputs(ld->wallet, fundingtx, NULL, &change);
+
+	wallet_tx_annotate_output(ld->wallet, &funding_txid, funding_outnum,
+				  TX_CHANNEL_FUNDING, channel->dbid);
 
 	/* We need these to compose cmd's response in funding_broadcast_success */
 	fc->hextx = tal_hex(fc, linearize_tx(fc->cmd, fundingtx));

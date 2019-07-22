@@ -374,7 +374,7 @@ void drop_to_chain(struct lightningd *ld, struct channel *channel,
 		sign_last_tx(channel);
 		bitcoin_txid(channel->last_tx, &txid);
 		wallet_transaction_add(ld->wallet, channel->last_tx, 0, 0);
-		wallet_transaction_annotate(ld->wallet, &txid, channel->last_tx_type, channel->dbid);
+		wallet_tx_annotate_input(ld->wallet, &txid, 0, channel->last_tx_type, channel->dbid);
 
 		/* Keep broadcasting until we say stop (can fail due to dup,
 		 * if they beat us to the broadcast). */
@@ -1001,8 +1001,10 @@ static enum watch_result funding_depth_cb(struct lightningd *ld,
 	if ((min_depth_reached && !channel->scid) || (depth && channel->scid)) {
 		struct txlocator *loc;
 
-		wallet_transaction_annotate(ld->wallet, txid,
-					    TX_CHANNEL_FUNDING, channel->dbid);
+		wallet_tx_annotate_output(ld->wallet, txid,
+					  channel->funding_outnum,
+					  TX_CHANNEL_FUNDING, channel->dbid);
+
 		loc = wallet_transaction_locate(tmpctx, ld->wallet, txid);
 		if (!mk_short_channel_id(&scid,
 					 loc->blkheight, loc->index,

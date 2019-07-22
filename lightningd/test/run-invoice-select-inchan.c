@@ -561,15 +561,20 @@ struct amount_msat wallet_total_forward_fees(struct wallet *w UNNEEDED)
 void wallet_transaction_add(struct wallet *w UNNEEDED, const struct bitcoin_tx *tx UNNEEDED,
 			    const u32 blockheight UNNEEDED, const u32 txindex UNNEEDED)
 { fprintf(stderr, "wallet_transaction_add called!\n"); abort(); }
-/* Generated stub for wallet_transaction_annotate */
-void wallet_transaction_annotate(struct wallet *w UNNEEDED,
-				 const struct bitcoin_txid *txid UNNEEDED,
-				 enum wallet_tx_type type UNNEEDED, u64 channel_id UNNEEDED)
-{ fprintf(stderr, "wallet_transaction_annotate called!\n"); abort(); }
 /* Generated stub for wallet_transaction_locate */
 struct txlocator *wallet_transaction_locate(const tal_t *ctx UNNEEDED, struct wallet *w UNNEEDED,
 					    const struct bitcoin_txid *txid UNNEEDED)
 { fprintf(stderr, "wallet_transaction_locate called!\n"); abort(); }
+/* Generated stub for wallet_tx_annotate_input */
+void wallet_tx_annotate_input(struct wallet *w UNNEEDED, const struct bitcoin_txid *txid UNNEEDED,
+			      int innum UNNEEDED, enum wallet_tx_type type UNNEEDED,
+			      u64 channel_id UNNEEDED)
+{ fprintf(stderr, "wallet_tx_annotate_input called!\n"); abort(); }
+/* Generated stub for wallet_tx_annotate_output */
+void wallet_tx_annotate_output(struct wallet *w UNNEEDED,
+			       const struct bitcoin_txid *txid UNNEEDED, int outnum UNNEEDED,
+			       enum wallet_tx_type type UNNEEDED, u64 channel_id UNNEEDED)
+{ fprintf(stderr, "wallet_tx_annotate_output called!\n"); abort(); }
 /* Generated stub for watch_txid */
 struct txwatch *watch_txid(const tal_t *ctx UNNEEDED,
 			   struct chain_topology *topo UNNEEDED,

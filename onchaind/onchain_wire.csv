@@ -107,3 +107,5 @@ onchain_dev_memleak_reply,,leak,bool
 onchain_transaction_annotate,5034
 onchain_transaction_annotate,,txid,struct bitcoin_txid
 onchain_transaction_annotate,,type,enum wallet_tx_type
+onchain_transaction_annotate,,is_output,bool
+onchain_transaction_annotate,,num,u32

@@ -190,7 +190,11 @@ static void handle_onchain_broadcast_tx(struct channel *channel, const u8 *msg)
 
 	bitcoin_txid(tx, &txid);
 	wallet_transaction_add(w, tx, 0, 0);
-	wallet_transaction_annotate(w, &txid, type, channel->dbid);
+
+	/* This is from a resolution proposal from onchaind. We annotate the
+	 * input, and let the outputs be annotated when we extract coins we
+	 * own. */
+	wallet_tx_annotate_input(w, &txid, 0, type, channel->dbid);
 
 	/* We don't really care if it fails, we'll respond via watch. */
 	broadcast_tx(channel->peer->ld->topology, channel, tx, NULL);
@@ -309,12 +313,18 @@ static void onchain_transaction_annotate(struct channel *channel, const u8 *msg)
 {
 	struct bitcoin_txid txid;
 	enum wallet_tx_type type;
-	if (!fromwire_onchain_transaction_annotate(msg, &txid, &type))
+	u32 num;
+	bool is_output;
+	if (!fromwire_onchain_transaction_annotate(msg, &txid, &type, &is_output, &num))
 		fatal("onchaind gave invalid onchain_transaction_annotate "
 		      "message: %s",
 		      tal_hex(msg, msg));
-	wallet_transaction_annotate(channel->peer->ld->wallet, &txid, type,
-				    channel->dbid);
+	if (is_output)
+		wallet_tx_annotate_output(channel->peer->ld->wallet, &txid, num,
+					  type, channel->dbid);
+	else
+		wallet_tx_annotate_input(channel->peer->ld->wallet, &txid, num,
+					 type, channel->dbid);
 }
 
 static unsigned int onchain_msg(struct subd *sd, const u8 *msg, const int *fds UNUSED)

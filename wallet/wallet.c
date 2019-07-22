@@ -2517,6 +2517,64 @@ void wallet_transaction_annotate(struct wallet *w,
 	db_exec_prepared(w->db, stmt);
 }
 
+void wallet_tx_annotate_input(struct wallet *w, const struct bitcoin_txid *txid,
+			      int innum, enum wallet_tx_type type,
+			      u64 channel_id)
+{
+	sqlite3_stmt *stmt = db_select_prepare(w->db, "type, channel_id FROM transactions WHERE id=?");
+	sqlite3_bind_sha256(stmt, 1, &txid->shad.sha);
+	if (!db_select_step(w->db, stmt))
+		fatal("Attempting to annotate a transaction we don't have: %s",
+		      type_to_string(tmpctx, struct bitcoin_txid, txid));
+	db_stmt_done(stmt);
+
+	stmt = db_prepare(w->db,
+			  "INSERT INTO transaction_inputs "
+			  "(txid, innum, type, channel_id) "
+			  "VALUES (?, ?, ?, ?)");
+
+	sqlite3_bind_sha256(stmt, 1, &txid->shad.sha);
+	sqlite3_bind_int(stmt, 2, innum);
+	sqlite3_bind_int(stmt, 3, type);
+
+	if (channel_id)
+		sqlite3_bind_int(stmt, 4, channel_id);
+	else
+		sqlite3_bind_null(stmt, 4);
+
+	db_exec_prepared(w->db, stmt);
+}
+
+void wallet_tx_annotate_output(struct wallet *w,
+			       const struct bitcoin_txid *txid, int outnum,
+			       enum wallet_tx_type type, u64 channel_id)
+{
+	sqlite3_stmt *stmt = db_select_prepare(w->db, "type, channel_id FROM transactions WHERE id=?");
+	sqlite3_bind_sha256(stmt, 1, &txid->shad.sha);
+	if (!db_select_step(w->db, stmt))
+		fatal("Attempting to annotate a transaction we don't have: %s",
+		      type_to_string(tmpctx, struct bitcoin_txid, txid));
+	db_stmt_done(stmt);
+
+	stmt = db_prepare(w->db,
+			  "INSERT INTO transaction_outputs "
+			  "(txid, outnum, type, channel_id) "
+			  "VALUES (?, ?, ?, ?)");
+
+	sqlite3_bind_sha256(stmt, 1, &txid->shad.sha);
+	sqlite3_bind_int(stmt, 2, outnum);
+	sqlite3_bind_int(stmt, 3, type);
+
+	if (channel_id)
+		sqlite3_bind_int(stmt, 4, channel_id);
+	else
+		sqlite3_bind_null(stmt, 4);
+
+	db_exec_prepared(w->db, stmt);
+}
+
+
+
 u32 wallet_transaction_height(struct wallet *w, const struct bitcoin_txid *txid)
 {
 	u32 blockheight;

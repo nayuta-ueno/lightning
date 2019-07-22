@@ -1059,6 +1059,14 @@ void wallet_transaction_annotate(struct wallet *w,
 				 const struct bitcoin_txid *txid,
 				 enum wallet_tx_type type, u64 channel_id);
 
+
+void wallet_tx_annotate_input(struct wallet *w, const struct bitcoin_txid *txid,
+			      int innum, enum wallet_tx_type type,
+			      u64 channel_id);
+
+void wallet_tx_annotate_output(struct wallet *w,
+			       const struct bitcoin_txid *txid, int outnum,
+			       enum wallet_tx_type type, u64 channel_id);
 /**
  * Get the confirmation height of a transaction we are watching by its
  * txid. Returns 0 if the transaction was not part of any block.

@@ -58,6 +58,7 @@ static void wallet_withdrawal_broadcast(struct bitcoind *bitcoind UNUSED,
 	/* Massage output into shape so it doesn't kill the JSON serialization */
 	char *output = tal_strjoin(cmd, tal_strsplit(cmd, msg, "\n", STR_NO_EMPTY), " ", STR_NO_TRAIL);
 	if (exitstatus == 0) {
+		wallet_transaction_add(ld->wallet, utx->tx, 0, 0);
 		/* Mark used outputs as spent */
 		wallet_confirm_utxos(ld->wallet, utx->wtx->utxos);
 
@@ -348,8 +349,10 @@ static struct command_result *json_withdraw(struct command *cmd,
 	/* Store the transaction in the DB and annotate it as a withdrawal */
 	bitcoin_txid(utx->tx, &txid);
 	wallet_transaction_add(cmd->ld->wallet, utx->tx, 0, 0);
-	wallet_transaction_annotate(cmd->ld->wallet, &txid,
-				    TX_WALLET_WITHDRAWAL, 0);
+	wallet_tx_annotate_output(cmd->ld->wallet, &txid, !utx->change_outnum,
+				  TX_WALLET_WITHDRAWAL, 0);
+	wallet_tx_annotate_output(cmd->ld->wallet, &txid, utx->change_outnum,
+				  TX_WALLET_DEPOSIT, 0);
 
 	return broadcast_and_wait(cmd, utx);
 }

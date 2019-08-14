@@ -1,0 +1,17 @@
+name: C/C++ CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@master
+    - name: configure
+      run: ./configure --enable-developer --disable-valgrind
+    - name: make
+      run: make -j 8
+    - name: make test
+      run: make check

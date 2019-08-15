@@ -247,7 +247,7 @@ void db_close(struct db *db);
 void db_bind_null(struct db_stmt *stmt, int pos);
 void db_bind_int(struct db_stmt *stmt, int pos, int val);
 void db_bind_u64(struct db_stmt *stmt, int pos, u64 val);
-void db_bind_blob(struct db_stmt *stmt, int pos, u8 *val, size_t len);
+void db_bind_blob(struct db_stmt *stmt, int pos, const u8 *val, size_t len);
 void db_bind_text(struct db_stmt *stmt, int pos, const char *val);
 bool db_exec_prepared_v2(struct db_stmt *stmt TAKES);
 

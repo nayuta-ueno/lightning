@@ -1330,7 +1330,7 @@ void db_bind_u64(struct db_stmt *stmt, int pos, u64 val)
 	stmt->bindings[pos].v.u64 = val;
 }
 
-void db_bind_blob(struct db_stmt *stmt, int pos, u8 *val, size_t len)
+void db_bind_blob(struct db_stmt *stmt, int pos, const u8 *val, size_t len)
 {
 	assert(pos < tal_count(stmt->bindings));
 	stmt->bindings[pos].type = DB_BINDING_BLOB;

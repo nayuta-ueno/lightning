@@ -1323,7 +1323,7 @@ void db_bind_text(struct db_stmt *stmt, int pos, const char *val)
 	stmt->bindings[pos].len = strlen(val);
 }
 
-bool db_exec_prepared_v2(struct db_stmt *stmt)
+bool db_exec_prepared_v2(struct db_stmt *stmt TAKES)
 {
 	const char *expanded_sql;
 	bool ret = stmt->db->config->exec_fn(stmt);

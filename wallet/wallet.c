@@ -28,7 +28,7 @@ AUTODATA_TYPE(db_backends, struct db_config);
 
 static void outpointfilters_init(struct wallet *w)
 {
-	sqlite3_stmt *stmt;
+	struct db_stmt *stmt;
 	struct utxo **utxos = wallet_get_utxos(NULL, w, output_state_any);
 	struct bitcoin_txid txid;
 	u32 outnum;
@@ -40,13 +40,17 @@ static void outpointfilters_init(struct wallet *w)
 	tal_free(utxos);
 
 	w->utxoset_outpoints = outpointfilter_new(w);
-	stmt = db_select_prepare(w->db, "SELECT txid, outnum FROM utxoset WHERE spendheight is NULL");
+	stmt = db_prepare_v2(
+	    w->db,
+	    SQL("SELECT txid, outnum FROM utxoset WHERE spendheight is NULL"));
+	db_query_prepared(stmt);
 
-	while (db_select_step(w->db, stmt)) {
-		sqlite3_column_sha256_double(stmt, 0, &txid.shad);
-		outnum = sqlite3_column_int(stmt, 1);
+	while (db_step(stmt)) {
+		db_column_sha256d(stmt, 0, &txid.shad);
+		outnum = db_column_int(stmt, 1);
 		outpointfilter_add(w->utxoset_outpoints, &txid, outnum);
 	}
+	tal_free(stmt);
 }
 
 struct wallet *wallet_new(struct lightningd *ld,
@@ -73,16 +77,18 @@ bool wallet_add_utxo(struct wallet *w, struct utxo *utxo,
 {
 	struct db_stmt *stmt;
 
-	stmt = db_select_prepare(w->db,
-				 "SELECT * from outputs WHERE prev_out_tx=? AND prev_out_index=?");
-	sqlite3_bind_blob(stmt, 1, &utxo->txid, sizeof(utxo->txid), SQLITE_TRANSIENT);
-	sqlite3_bind_int(stmt, 2, utxo->outnum);
+	stmt = db_prepare_v2(w->db, SQL("SELECT * from outputs WHERE "
+					"prev_out_tx=? AND prev_out_index=?"));
+	db_bind_txid(stmt, 0, &utxo->txid);
+	db_bind_int(stmt, 1, utxo->outnum);
+	db_query_prepared(stmt);
 
 	/* If we get a result, that means a clash. */
-	if (db_select_step(w->db, stmt)) {
-		db_stmt_done(stmt);
+	if (db_step(stmt)) {
+		tal_free(stmt);
 		return false;
 	}
+	tal_free(stmt);
 
 	stmt = db_prepare_v2(
 	    w->db, SQL("INSERT INTO outputs ("

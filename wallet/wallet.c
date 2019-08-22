@@ -1074,86 +1074,88 @@ void wallet_channel_stats_load(struct wallet *w,
 			       u64 id,
 			       struct channel_stats *stats)
 {
-	sqlite3_stmt *stmt;
+	struct db_stmt *stmt;
 	int res;
-	stmt = db_select_prepare(w->db,
-				 "SELECT"
-			  "   in_payments_offered,  in_payments_fulfilled"
-			  ",  in_msatoshi_offered,  in_msatoshi_fulfilled"
-			  ", out_payments_offered, out_payments_fulfilled"
-			  ", out_msatoshi_offered, out_msatoshi_fulfilled"
-			  "  FROM channels"
-			  " WHERE id = ?");
-	sqlite3_bind_int64(stmt, 1, id);
+	stmt = db_prepare_v2(w->db, SQL(
+				     "SELECT"
+				     "   in_payments_offered,  in_payments_fulfilled"
+				     ",  in_msatoshi_offered,  in_msatoshi_fulfilled"
+				     ", out_payments_offered, out_payments_fulfilled"
+				     ", out_msatoshi_offered, out_msatoshi_fulfilled"
+				     "  FROM channels"
+				     " WHERE id = ?"));
+	db_bind_u64(stmt, 0, id);
+	db_query_prepared(stmt);
 
-	res = sqlite3_step(stmt);
+	res = db_step(stmt);
 
 	/* This must succeed, since we know the channel exists */
-	assert(res == SQLITE_ROW);
+	assert(res);
 
-	stats->in_payments_offered = sqlite3_column_int64(stmt, 0);
-	stats->in_payments_fulfilled = sqlite3_column_int64(stmt, 1);
-	stats->in_msatoshi_offered = sqlite3_column_amount_msat(stmt, 2);
-	stats->in_msatoshi_fulfilled = sqlite3_column_amount_msat(stmt, 3);
-	stats->out_payments_offered = sqlite3_column_int64(stmt, 4);
-	stats->out_payments_fulfilled = sqlite3_column_int64(stmt, 5);
-	stats->out_msatoshi_offered = sqlite3_column_amount_msat(stmt, 6);
-	stats->out_msatoshi_fulfilled = sqlite3_column_amount_msat(stmt, 7);
-	db_stmt_done(stmt);
+	stats->in_payments_offered = db_column_u64(stmt, 0);
+	stats->in_payments_fulfilled = db_column_u64(stmt, 1);
+	db_column_amount_msat(stmt, 2, &stats->in_msatoshi_offered);
+	db_column_amount_msat(stmt, 3, &stats->in_msatoshi_fulfilled);
+	stats->out_payments_offered = db_column_u64(stmt, 4);
+	stats->out_payments_fulfilled = db_column_u64(stmt, 5);
+	db_column_amount_msat(stmt, 6, &stats->out_msatoshi_offered);
+	db_column_amount_msat(stmt, 7, &stats->out_msatoshi_fulfilled);
+	tal_free(stmt);
 }
 
 void wallet_blocks_heights(struct wallet *w, u32 def, u32 *min, u32 *max)
 {
 	assert(min != NULL && max != NULL);
-	sqlite3_stmt *stmt = db_select_prepare(w->db, "SELECT MIN(height), MAX(height) FROM blocks;");
-
+	struct db_stmt *stmt = db_prepare_v2(w->db, SQL("SELECT MIN(height), MAX(height) FROM blocks;"));
+	db_query_prepared(stmt);
 	*min = def;
 	*max = def;
 
 	/* If we ever processed a block we'll get the latest block in the chain */
-	if (db_select_step(w->db, stmt)) {
-		if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
-			*min = sqlite3_column_int(stmt, 0);
-			*max = sqlite3_column_int(stmt, 1);
+	if (db_step(stmt)) {
+		if (!db_column_is_null(stmt, 0)) {
+			*min = db_column_int(stmt, 0);
+			*max = db_column_int(stmt, 1);
 		}
-		db_stmt_done(stmt);
 	}
+	tal_free(stmt);
 }
 
 static void wallet_channel_config_insert(struct wallet *w,
 					 struct channel_config *cc)
 {
-	sqlite3_stmt *stmt;
+	struct db_stmt *stmt;
 
 	assert(cc->id == 0);
 
-	stmt = db_prepare(w->db, "INSERT INTO channel_configs DEFAULT VALUES;");
-	db_exec_prepared(w->db, stmt);
-	cc->id = db_last_insert_id(w->db);
+	stmt = db_prepare_v2(w->db, SQL("INSERT INTO channel_configs DEFAULT VALUES;"));
+	db_exec_prepared_v2(stmt);
+	cc->id = db_last_insert_id_v2(stmt);
+	tal_free(stmt);
 }
 
 static void wallet_channel_config_save(struct wallet *w,
 				       const struct channel_config *cc)
 {
-	sqlite3_stmt *stmt;
+	struct db_stmt *stmt;
 
 	assert(cc->id != 0);
-	stmt = db_prepare(w->db, "UPDATE channel_configs SET"
-			  "  dust_limit_satoshis=?,"
-			  "  max_htlc_value_in_flight_msat=?,"
-			  "  channel_reserve_satoshis=?,"
-			  "  htlc_minimum_msat=?,"
-			  "  to_self_delay=?,"
-			  "  max_accepted_htlcs=?"
-			  " WHERE id=?;");
-	sqlite3_bind_amount_sat(stmt, 1, cc->dust_limit);
-	sqlite3_bind_amount_msat(stmt, 2, cc->max_htlc_value_in_flight);
-	sqlite3_bind_amount_sat(stmt, 3, cc->channel_reserve);
-	sqlite3_bind_amount_msat(stmt, 4, cc->htlc_minimum);
-	sqlite3_bind_int(stmt, 5, cc->to_self_delay);
-	sqlite3_bind_int(stmt, 6, cc->max_accepted_htlcs);
-	sqlite3_bind_int64(stmt, 7, cc->id);
-	db_exec_prepared(w->db, stmt);
+	stmt = db_prepare_v2(w->db, SQL("UPDATE channel_configs SET"
+					"  dust_limit_satoshis=?,"
+					"  max_htlc_value_in_flight_msat=?,"
+					"  channel_reserve_satoshis=?,"
+					"  htlc_minimum_msat=?,"
+					"  to_self_delay=?,"
+					"  max_accepted_htlcs=?"
+					" WHERE id=?;"));
+	db_bind_amount_sat(stmt, 0, &cc->dust_limit);
+	db_bind_amount_msat(stmt, 1, &cc->max_htlc_value_in_flight);
+	db_bind_amount_sat(stmt, 2, &cc->channel_reserve);
+	db_bind_amount_msat(stmt, 3, &cc->htlc_minimum);
+	db_bind_int(stmt, 4, cc->to_self_delay);
+	db_bind_int(stmt, 5, cc->max_accepted_htlcs);
+	db_bind_u64(stmt, 6, cc->id);
+	db_exec_prepared_v2(take(stmt));
 }
 
 bool wallet_channel_config_load(struct wallet *w, const u64 id,

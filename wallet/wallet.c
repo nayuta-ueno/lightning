@@ -764,7 +764,7 @@ fail:
 /**
  * wallet_stmt2channel - Helper to populate a wallet_channel from a sqlite3_stmt
  */
-static struct channel *wallet_stmt2channel(struct wallet *w, sqlite3_stmt *stmt)
+static struct channel *wallet_stmt2channel(struct wallet *w, struct db_stmt *stmt)
 {
 	bool ok = true;
 	struct channel_info channel_info;
@@ -778,12 +778,14 @@ static struct channel *wallet_stmt2channel(struct wallet *w, sqlite3_stmt *stmt)
 	struct bitcoin_signature last_sig;
 	u8 *remote_shutdown_scriptpubkey;
 	struct changed_htlc *last_sent_commit;
-	s64 final_key_idx;
+	s64 final_key_idx, channel_config_id;
 	struct basepoints local_basepoints;
 	struct pubkey local_funding_pubkey;
 	struct pubkey *future_per_commitment_point;
+	struct amount_sat funding_sat;
+	struct amount_msat push_msat, our_msat, msat_to_us_min, msat_to_us_max;
 
-	peer_dbid = sqlite3_column_int64(stmt, 1);
+	peer_dbid = db_column_u64(stmt, 1);
 	peer = find_peer_by_dbid(w->ld, peer_dbid);
 	if (!peer) {
 		peer = wallet_peer_load(w, peer_dbid);
@@ -792,23 +794,22 @@ static struct channel *wallet_stmt2channel(struct wallet *w, sqlite3_stmt *stmt)
 		}
 	}
 
-	if (sqlite3_column_type(stmt, 2) != SQLITE_NULL) {
+	if (!db_column_is_null(stmt, 2)) {
 		scid = tal(tmpctx, struct short_channel_id);
-		if (!sqlite3_column_short_channel_id(stmt, 2, scid))
+		if (!db_column_short_channel_id(stmt, 2, scid))
 			return NULL;
 	} else {
 		scid = NULL;
 	}
 
-	ok &= wallet_shachain_load(w, sqlite3_column_int64(stmt, 27),
-				   &wshachain);
+	ok &= wallet_shachain_load(w, db_column_u64(stmt, 27), &wshachain);
 
-	remote_shutdown_scriptpubkey = sqlite3_column_arr(tmpctx, stmt, 28, u8);
+	remote_shutdown_scriptpubkey = db_column_arr(tmpctx, stmt, 28, u8);
 
 	/* Do we have a last_sent_commit, if yes, populate */
-	if (sqlite3_column_type(stmt, 41) != SQLITE_NULL) {
-		const u8 *cursor = sqlite3_column_blob(stmt, 41);
-		size_t len = sqlite3_column_bytes(stmt, 41);
+	if (!db_column_is_null(stmt, 41)) {
+		const u8 *cursor = db_column_blob(stmt, 41);
+		size_t len = db_column_bytes(stmt, 41);
 		size_t n = 0;
 		last_sent_commit = tal_arr(tmpctx, struct changed_htlc, n);
 		while (len) {
@@ -820,178 +821,182 @@ static struct channel *wallet_stmt2channel(struct wallet *w, sqlite3_stmt *stmt)
 		last_sent_commit = NULL;
 
 #ifdef COMPAT_V060
-	if (!last_sent_commit && sqlite3_column_type(stmt, 30) != SQLITE_NULL) {
+	if (!last_sent_commit && !db_column_is_null(stmt, 30)) {
 		last_sent_commit = tal(tmpctx, struct changed_htlc);
-		last_sent_commit->newstate = sqlite3_column_int64(stmt, 30);
-		last_sent_commit->id = sqlite3_column_int64(stmt, 31);
+		last_sent_commit->newstate = db_column_u64(stmt, 30);
+		last_sent_commit->id = db_column_u64(stmt, 31);
 	}
 #endif
 
-	if (sqlite3_column_type(stmt, 40) != SQLITE_NULL) {
+	if (!db_column_is_null(stmt, 40)) {
 		future_per_commitment_point = tal(tmpctx, struct pubkey);
-		ok &= sqlite3_column_pubkey(stmt, 40,
-					    future_per_commitment_point);
+		db_column_pubkey(stmt, 40, future_per_commitment_point);
 	} else
 		future_per_commitment_point = NULL;
 
-	ok &= wallet_channel_config_load(w, sqlite3_column_int64(stmt, 3),
-					 &our_config);
-	ok &= sqlite3_column_sha256_double(stmt, 12, &funding_txid.shad);
-
-	ok &= sqlite3_column_signature(stmt, 33, &last_sig.s);
+	channel_config_id = db_column_u64(stmt, 3);
+	ok &= wallet_channel_config_load(w, channel_config_id, &our_config);
+	db_column_sha256d(stmt, 12, &funding_txid.shad);
+	ok &= db_column_signature(stmt, 33, &last_sig.s);
 	last_sig.sighash_type = SIGHASH_ALL;
 
 	/* Populate channel_info */
-	ok &= sqlite3_column_pubkey(stmt, 18, &channel_info.remote_fundingkey);
-	ok &= sqlite3_column_pubkey(stmt, 19, &channel_info.theirbase.revocation);
-	ok &= sqlite3_column_pubkey(stmt, 20, &channel_info.theirbase.payment);
-	ok &= sqlite3_column_pubkey(stmt, 21, &channel_info.theirbase.htlc);
-	ok &= sqlite3_column_pubkey(stmt, 22, &channel_info.theirbase.delayed_payment);
-	ok &= sqlite3_column_pubkey(stmt, 23, &channel_info.remote_per_commit);
-	ok &= sqlite3_column_pubkey(stmt, 24, &channel_info.old_remote_per_commit);
-	channel_info.feerate_per_kw[LOCAL] = sqlite3_column_int(stmt, 25);
-	channel_info.feerate_per_kw[REMOTE] = sqlite3_column_int(stmt, 26);
+	db_column_pubkey(stmt, 18, &channel_info.remote_fundingkey);
+	db_column_pubkey(stmt, 19, &channel_info.theirbase.revocation);
+	db_column_pubkey(stmt, 20, &channel_info.theirbase.payment);
+	db_column_pubkey(stmt, 21, &channel_info.theirbase.htlc);
+	db_column_pubkey(stmt, 22, &channel_info.theirbase.delayed_payment);
+	db_column_pubkey(stmt, 23, &channel_info.remote_per_commit);
+	db_column_pubkey(stmt, 24, &channel_info.old_remote_per_commit);
+	channel_info.feerate_per_kw[LOCAL] = db_column_int(stmt, 25);
+	channel_info.feerate_per_kw[REMOTE] = db_column_int(stmt, 26);
 
-	wallet_channel_config_load(w, sqlite3_column_int64(stmt, 4),
+	wallet_channel_config_load(w, db_column_u64(stmt, 4),
 				   &channel_info.their_config);
 
 	if (!ok) {
 		return NULL;
 	}
 
-	final_key_idx = sqlite3_column_int64(stmt, 29);
+	final_key_idx = db_column_u64(stmt, 29);
 	if (final_key_idx < 0) {
 		log_broken(w->log, "%s: Final key < 0", __func__);
 		return NULL;
 	}
 
-	get_channel_basepoints(w->ld, &peer->id, sqlite3_column_int64(stmt, 0),
+	get_channel_basepoints(w->ld, &peer->id, db_column_u64(stmt, 0),
 			       &local_basepoints, &local_funding_pubkey);
-	chan = new_channel(peer, sqlite3_column_int64(stmt, 0),
+
+	db_column_amount_sat(stmt, 14, &funding_sat);
+	db_column_amount_msat(stmt, 16, &push_msat);
+	db_column_amount_msat(stmt, 17, &our_msat);
+	db_column_amount_msat(stmt, 38, &msat_to_us_min);
+	db_column_amount_msat(stmt, 39, &msat_to_us_max);
+
+	chan = new_channel(peer, db_column_u64(stmt, 0),
 			   &wshachain,
-			   sqlite3_column_int(stmt, 5),
-			   sqlite3_column_int(stmt, 6),
+			   db_column_int(stmt, 5),
+			   db_column_int(stmt, 6),
 			   NULL, /* Set up fresh log */
 			   "Loaded from database",
-			   sqlite3_column_int(stmt, 7),
+			   db_column_int(stmt, 7),
 			   &our_config,
-			   sqlite3_column_int(stmt, 8),
-			   sqlite3_column_int64(stmt, 9),
-			   sqlite3_column_int64(stmt, 10),
-			   sqlite3_column_int64(stmt, 11),
+			   db_column_int(stmt, 8),
+			   db_column_u64(stmt, 9),
+			   db_column_u64(stmt, 10),
+			   db_column_u64(stmt, 11),
 			   &funding_txid,
-			   sqlite3_column_int(stmt, 13),
-			   sqlite3_column_amount_sat(stmt, 14),
-			   sqlite3_column_amount_msat(stmt, 16),
-			   sqlite3_column_int(stmt, 15) != 0,
+			   db_column_int(stmt, 13),
+			   funding_sat,
+			   push_msat,
+			   db_column_int(stmt, 15) != 0,
 			   scid,
-			   sqlite3_column_amount_msat(stmt, 17),
-			   sqlite3_column_amount_msat(stmt, 38), /* msatoshi_to_us_min */
-			   sqlite3_column_amount_msat(stmt, 39), /* msatoshi_to_us_max */
-			   sqlite3_column_tx(tmpctx, stmt, 32),
+			   our_msat,
+			   msat_to_us_min, /* msatoshi_to_us_min */
+			   msat_to_us_max, /* msatoshi_to_us_max */
+			   db_column_tx(tmpctx, stmt, 32),
 			   &last_sig,
 			   wallet_htlc_sigs_load(tmpctx, w,
-						 sqlite3_column_int64(stmt, 0)),
+						 db_column_u64(stmt, 0)),
 			   &channel_info,
 			   remote_shutdown_scriptpubkey,
 			   final_key_idx,
-			   sqlite3_column_int(stmt, 34) != 0,
+			   db_column_int(stmt, 34) != 0,
 			   last_sent_commit,
-			   sqlite3_column_int64(stmt, 35),
-			   sqlite3_column_int(stmt, 36),
-			   sqlite3_column_int(stmt, 37),
+			   db_column_u64(stmt, 35),
+			   db_column_int(stmt, 36),
+			   db_column_int(stmt, 37),
 			   /* Not connected */
 			   false,
 			   &local_basepoints, &local_funding_pubkey,
 			   future_per_commitment_point,
-			   sqlite3_column_int(stmt, 42),
-			   sqlite3_column_int(stmt, 43),
-			   sqlite3_column_arr(tmpctx, stmt, 44, u8));
+			   db_column_int(stmt, 42),
+			   db_column_int(stmt, 43),
+			   db_column_arr(tmpctx, stmt, 44, u8));
 	return chan;
 }
 
 static void set_max_channel_dbid(struct wallet *w)
 {
-	sqlite3_stmt *stmt;
-	int result;
+	struct db_stmt *stmt;
 
-	stmt = db_select(w->db, "SELECT id FROM channels ORDER BY id DESC LIMIT 1;");
+	stmt = db_prepare_v2(w->db, SQL("SELECT id FROM channels ORDER BY id DESC LIMIT 1;"));
+	db_query_prepared(stmt);
 	w->max_channel_dbid = 0;
 
-	result = sqlite3_step(stmt);
-	if (result == SQLITE_ROW)
-		w->max_channel_dbid = sqlite3_column_int64(stmt, 0);
+	if (db_step(stmt))
+		w->max_channel_dbid =db_column_u64(stmt, 0);
 
-	db_stmt_done(stmt);
+	tal_free(stmt);
 }
 
 static bool wallet_channels_load_active(struct wallet *w)
 {
 	bool ok = true;
-	sqlite3_stmt *stmt;
+	struct db_stmt *stmt;
 	int count = 0;
 
 	/* We load all channels */
-	stmt = db_select(w->db, "SELECT"
-				"  id"
-				", peer_id"
-				", short_channel_id"
-				", channel_config_local"
-				", channel_config_remote"
-				", state"
-				", funder"
-				", channel_flags"
-				", minimum_depth"
-				", next_index_local"
-				", next_index_remote"
-				", next_htlc_id"
-				", funding_tx_id"
-				", funding_tx_outnum"
-				", funding_satoshi"
-				", funding_locked_remote"
-				", push_msatoshi"
-				", msatoshi_local"
-				", fundingkey_remote"
-				", revocation_basepoint_remote"
-				", payment_basepoint_remote"
-				", htlc_basepoint_remote"
-				", delayed_payment_basepoint_remote"
-				", per_commit_remote"
-				", old_per_commit_remote"
-				", local_feerate_per_kw"
-				", remote_feerate_per_kw"
-				", shachain_remote_id"
-				", shutdown_scriptpubkey_remote"
-				", shutdown_keyidx_local"
-				", last_sent_commit_state"
-				", last_sent_commit_id"
-				", last_tx"
-				", last_sig"
-				", last_was_revoke"
-				", first_blocknum"
-				", min_possible_feerate"
-				", max_possible_feerate"
-				", msatoshi_to_us_min"
-				", msatoshi_to_us_max"
-				", future_per_commitment_point"
-				", last_sent_commit"
-				", feerate_base"
-				", feerate_ppm"
-				", remote_upfront_shutdown_script"
-				" FROM channels WHERE state < ?;");
-	sqlite3_bind_int(stmt, 1, CLOSED);
+	stmt = db_prepare_v2(w->db, SQL("SELECT"
+					"  id"
+					", peer_id"
+					", short_channel_id"
+					", channel_config_local"
+					", channel_config_remote"
+					", state"
+					", funder"
+					", channel_flags"
+					", minimum_depth"
+					", next_index_local"
+					", next_index_remote"
+					", next_htlc_id"
+					", funding_tx_id"
+					", funding_tx_outnum"
+					", funding_satoshi"
+					", funding_locked_remote"
+					", push_msatoshi"
+					", msatoshi_local"
+					", fundingkey_remote"
+					", revocation_basepoint_remote"
+					", payment_basepoint_remote"
+					", htlc_basepoint_remote"
+					", delayed_payment_basepoint_remote"
+					", per_commit_remote"
+					", old_per_commit_remote"
+					", local_feerate_per_kw"
+					", remote_feerate_per_kw"
+					", shachain_remote_id"
+					", shutdown_scriptpubkey_remote"
+					", shutdown_keyidx_local"
+					", last_sent_commit_state"
+					", last_sent_commit_id"
+					", last_tx"
+					", last_sig"
+					", last_was_revoke"
+					", first_blocknum"
+					", min_possible_feerate"
+					", max_possible_feerate"
+					", msatoshi_to_us_min"
+					", msatoshi_to_us_max"
+					", future_per_commitment_point"
+					", last_sent_commit"
+					", feerate_base"
+					", feerate_ppm"
+					", remote_upfront_shutdown_script"
+					" FROM channels WHERE state < ?;"));
+	db_bind_int(stmt, 0, CLOSED);
+	db_query_prepared(stmt);
 
-	while (db_select_step(w->db, stmt)) {
+	while (db_step(stmt)) {
 		struct channel *c = wallet_stmt2channel(w, stmt);
 		if (!c) {
 			ok = false;
-			db_stmt_done(stmt);
 			break;
 		}
 		count++;
 	}
 	log_debug(w->log, "Loaded %d channels from DB", count);
-
+	tal_free(stmt);
 	return ok;
 }
 

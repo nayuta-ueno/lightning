@@ -1438,6 +1438,14 @@ void db_column_pubkey(struct db_stmt *stmt, int pos, struct pubkey *dest)
 	assert(ok);
 }
 
+bool db_column_signature(struct db_stmt *stmt, int col,
+			 secp256k1_ecdsa_signature *sig)
+{
+	assert(db_column_bytes(stmt, col) == 64);
+	return secp256k1_ecdsa_signature_parse_compact(
+		   secp256k1_ctx, sig, db_column_blob(stmt, col)) == 1;
+}
+
 void db_column_amount_msat(struct db_stmt *stmt, int col,
 			   struct amount_msat *msat)
 {

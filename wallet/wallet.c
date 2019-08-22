@@ -925,7 +925,7 @@ static void set_max_channel_dbid(struct wallet *w)
 	w->max_channel_dbid = 0;
 
 	if (db_step(stmt))
-		w->max_channel_dbid =db_column_u64(stmt, 0);
+		w->max_channel_dbid = db_column_u64(stmt, 0);
 
 	tal_free(stmt);
 }

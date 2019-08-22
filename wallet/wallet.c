@@ -665,46 +665,52 @@ bool wallet_shachain_load(struct wallet *wallet, u64 id,
 static struct peer *wallet_peer_load(struct wallet *w, const u64 dbid)
 {
 	const unsigned char *addrstr;
-	struct peer *peer;
+	struct peer *peer = NULL;
 	struct node_id id;
 	struct wireaddr_internal addr;
+	struct db_stmt *stmt;
 
-	sqlite3_stmt *stmt = db_select_prepare(
-	    w->db, "SELECT id, node_id, address FROM peers WHERE id=?;");
-	sqlite3_bind_int64(stmt, 1, dbid);
+	stmt = db_prepare_v2(
+	    w->db, SQL("SELECT id, node_id, address FROM peers WHERE id=?;"));
+	db_bind_u64(stmt, 0, dbid);
+	db_query_prepared(stmt);
 
-	if (!db_select_step(w->db, stmt))
-		return NULL;
+	if (!db_step(stmt))
+		goto done;
 
-	if (!sqlite3_column_node_id(stmt, 1, &id)) {
-		db_stmt_done(stmt);
-		return NULL;
-	}
-	addrstr = sqlite3_column_text(stmt, 2);
-	if (!parse_wireaddr_internal((const char*)addrstr, &addr, DEFAULT_PORT, false, false, true, NULL)) {
-		db_stmt_done(stmt);
-		return NULL;
-	}
+	if (db_column_is_null(stmt, 1))
+		goto done;
 
-	peer = new_peer(w->ld, sqlite3_column_int64(stmt, 0),
-			&id, &addr);
-	db_stmt_done(stmt);
+	db_column_node_id(stmt, 1, &id);
 
+	addrstr = db_column_text(stmt, 2);
+	if (!parse_wireaddr_internal((const char*)addrstr, &addr, DEFAULT_PORT, false, false, true, NULL))
+		goto done;
+
+	peer = new_peer(w->ld, db_column_u64(stmt, 0), &id, &addr);
+
+done:
+	tal_free(stmt);
 	return peer;
 }
 
 static secp256k1_ecdsa_signature *
 wallet_htlc_sigs_load(const tal_t *ctx, struct wallet *w, u64 channelid)
 {
-	sqlite3_stmt *stmt = db_select_prepare(w->db, "SELECT signature FROM htlc_sigs WHERE channelid = ?");
-	secp256k1_ecdsa_signature *htlc_sigs = tal_arr(ctx, secp256k1_ecdsa_signature, 0);
-	sqlite3_bind_int64(stmt, 1, channelid);
+	struct db_stmt *stmt;
 
-	while (db_select_step(w->db, stmt)) {
+	stmt = db_prepare_v2(
+	    w->db, SQL("SELECT signature FROM htlc_sigs WHERE channelid = ?"));
+	secp256k1_ecdsa_signature *htlc_sigs = tal_arr(ctx, secp256k1_ecdsa_signature, 0);
+	db_bind_u64(stmt, 0, channelid);
+	db_query_prepared(stmt);
+
+	while (db_step(stmt)) {
 		secp256k1_ecdsa_signature sig;
-		sqlite3_column_signature(stmt, 0, &sig);
+		db_column_signature(stmt, 0, &sig);
 		tal_arr_expand(&htlc_sigs, sig);
 	}
+	tal_free(stmt);
 
 	log_debug(w->log, "Loaded %zu HTLC signatures from DB",
 		  tal_count(htlc_sigs));
@@ -715,23 +721,23 @@ bool wallet_remote_ann_sigs_load(const tal_t *ctx, struct wallet *w, u64 id,
 				 secp256k1_ecdsa_signature **remote_ann_node_sig,
 				 secp256k1_ecdsa_signature **remote_ann_bitcoin_sig)
 {
-	sqlite3_stmt *stmt;
-	int res;
-	stmt = db_select_prepare(w->db,
-				 "SELECT remote_ann_node_sig, remote_ann_bitcoin_sig"
-				 " FROM channels WHERE id = ?");
-	sqlite3_bind_int64(stmt, 1, id);
+	struct db_stmt *stmt;
+	bool res;
+	stmt = db_prepare_v2(
+	    w->db, SQL("SELECT remote_ann_node_sig, remote_ann_bitcoin_sig"
+		       " FROM channels WHERE id = ?"));
+	db_bind_u64(stmt, 0, id);
+	db_query_prepared(stmt);
 
-	res = sqlite3_step(stmt);
+	res = db_step(stmt);
 
 	/* This must succeed, since we know the channel exists */
-	assert(res == SQLITE_ROW);
+	assert(res);
 
 	/* if only one sig exists, forget the sig and hope peer send new ones*/
-	if(sqlite3_column_type(stmt, 0) == SQLITE_NULL ||
-			sqlite3_column_type(stmt, 1) == SQLITE_NULL) {
+	if (db_column_is_null(stmt, 0) || db_column_is_null(stmt, 1)) {
 		*remote_ann_node_sig = *remote_ann_bitcoin_sig = NULL;
-		db_stmt_done(stmt);
+		tal_free(stmt);
 		return true;
 	}
 
@@ -739,19 +745,19 @@ bool wallet_remote_ann_sigs_load(const tal_t *ctx, struct wallet *w, u64 id,
 	*remote_ann_node_sig = tal(ctx, secp256k1_ecdsa_signature);
 	*remote_ann_bitcoin_sig = tal(ctx, secp256k1_ecdsa_signature);
 
-	if (!sqlite3_column_signature(stmt, 0, *remote_ann_node_sig))
+	if (!db_column_signature(stmt, 0, *remote_ann_node_sig))
 		goto fail;
 
-	if (!sqlite3_column_signature(stmt, 1, *remote_ann_bitcoin_sig))
+	if (!db_column_signature(stmt, 1, *remote_ann_bitcoin_sig))
 		goto fail;
 
-	db_stmt_done(stmt);
+	tal_free(stmt);
 	return true;
 
 fail:
 	*remote_ann_node_sig = tal_free(*remote_ann_node_sig);
 	*remote_ann_bitcoin_sig = tal_free(*remote_ann_bitcoin_sig);
-	db_stmt_done(stmt);
+	tal_free(stmt);
 	return false;
 }
 

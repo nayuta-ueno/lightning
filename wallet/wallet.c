@@ -1015,20 +1015,39 @@ void wallet_channel_stats_incr_x(struct wallet *w,
 				 u64 cdbid,
 				 struct amount_msat msat)
 {
-	char const *payments_stat = tal_fmt(tmpctx, "%s_payments_%s",
-					    dir, typ);
-	char const *msatoshi_stat = tal_fmt(tmpctx, "%s_msatoshi_%s",
-					    dir, typ);
-	char const *qry = tal_fmt(tmpctx,
-				  "UPDATE channels"
-				  "   SET %s = COALESCE(%s, 0) + 1"
-				  "     , %s = COALESCE(%s, 0) + %"PRIu64""
-				  " WHERE id = %"PRIu64";",
-				  payments_stat, payments_stat,
-				  msatoshi_stat, msatoshi_stat, msat.millisatoshis, /* Raw: db access */
-				  cdbid);
-	sqlite3_stmt *stmt = db_prepare(w->db, qry);
-	db_exec_prepared(w->db, stmt);
+	struct db_stmt *stmt;
+	const char *query;
+	/* TODO These would be much better as a switch statement, leaving
+	 * these here for now in order to keep the commit clean. */
+	if (streq(dir, "in") && streq(typ, "offered")) {
+		query = SQL("UPDATE channels"
+			    "   SET in_payments_offered = COALESCE(in_payments_offered, 0) + 1"
+			    "     , in_msatoshi_offered = COALESCE(in_msatoshi_offered, 0) + ?"
+			    " WHERE id = ?;");
+	} else if (streq(dir, "in") && streq(typ, "fulfilled")) {
+		query = SQL("UPDATE channels"
+			    "   SET in_payments_fulfilled = COALESCE(in_payments_fulfilled, 0) + 1"
+			    "     , in_msatoshi_fulfilled = COALESCE(in_msatoshi_fulfilled, 0) + ?"
+			    " WHERE id = ?;");
+	} else if (streq(dir, "out") && streq(typ, "offered")) {
+		query = SQL("UPDATE channels"
+			    "   SET out_payments_offered = COALESCE(out_payments_offered, 0) + 1"
+			    "     , out_msatoshi_offered = COALESCE(out_msatoshi_offered, 0) + ?"
+			    " WHERE id = ?;");
+	} else if (streq(dir, "out") && streq(typ, "fulfilled")) {
+		query = SQL("UPDATE channels"
+			    "   SET out_payments_fulfilled = COALESCE(out_payments_fulfilled, 0) + 1"
+			    "     , out_msatoshi_fulfilled = COALESCE(out_msatoshi_fulfilled, 0) + ?"
+			    " WHERE id = ?;");
+	} else {
+		fatal("Unknown stats key %s %s", dir, typ);
+	}
+
+	stmt = db_prepare_v2(w->db, query);
+	db_bind_amount_msat(stmt, 0, &msat);
+	db_bind_u64(stmt, 1, cdbid);
+
+	db_exec_prepared_v2(take(stmt));
 }
 void wallet_channel_stats_incr_in_offered(struct wallet *w, u64 id,
 					  struct amount_msat m)

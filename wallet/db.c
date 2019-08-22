@@ -1384,6 +1384,17 @@ void db_bind_pubkey(struct db_stmt *stmt, int pos, const struct pubkey *pk)
 	db_bind_blob(stmt, pos, der, PUBKEY_CMPR_LEN);
 }
 
+void db_bind_signature(struct db_stmt *stmt, int col,
+		       const secp256k1_ecdsa_signature *sig)
+{
+	bool ok;
+	u8 buf[64];
+	ok = secp256k1_ecdsa_signature_serialize_compact(secp256k1_ctx, buf,
+							 sig) == 1;
+	assert(ok);
+	db_bind_blob(stmt, col, buf, sizeof(buf));
+}
+
 void db_bind_amount_msat(struct db_stmt *stmt, int pos,
 			 const struct amount_msat *msat)
 {

@@ -256,6 +256,8 @@ void db_bind_secret(struct db_stmt *stmt, int pos, const struct secret *s);
 void db_bind_txid(struct db_stmt *stmt, int pos, const struct bitcoin_txid *t);
 void db_bind_node_id(struct db_stmt *stmt, int pos, const struct node_id *ni);
 void db_bind_pubkey(struct db_stmt *stmt, int pos, const struct pubkey *p);
+void db_bind_signature(struct db_stmt *stmt, int col,
+		       const secp256k1_ecdsa_signature *sig);
 void db_bind_amount_msat(struct db_stmt *stmt, int pos,
 			 const struct amount_msat *msat);
 void db_bind_amount_sat(struct db_stmt *stmt, int pos,

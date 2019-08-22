@@ -1438,12 +1438,45 @@ void db_column_pubkey(struct db_stmt *stmt, int pos, struct pubkey *dest)
 	assert(ok);
 }
 
+bool db_column_short_channel_id(struct db_stmt *stmt, int col,
+				struct short_channel_id *dest)
+{
+	const char *source = db_column_blob(stmt, col);
+	size_t sourcelen = db_column_bytes(stmt, col);
+	return short_channel_id_from_str(source, sourcelen, dest, true);
+}
+
 bool db_column_signature(struct db_stmt *stmt, int col,
 			 secp256k1_ecdsa_signature *sig)
 {
 	assert(db_column_bytes(stmt, col) == 64);
 	return secp256k1_ecdsa_signature_parse_compact(
 		   secp256k1_ctx, sig, db_column_blob(stmt, col)) == 1;
+}
+
+struct bitcoin_tx *db_column_tx(const tal_t *ctx, struct db_stmt *stmt, int col)
+{
+	const u8 *src = db_column_blob(stmt, col);
+	size_t len = db_column_bytes(stmt, col);
+	return pull_bitcoin_tx(ctx, &src, &len);
+}
+
+void *db_column_arr_(const tal_t *ctx, struct db_stmt *stmt, int col,
+			  size_t bytes, const char *label, const char *caller)
+{
+	size_t sourcelen = db_column_bytes(stmt, col);
+	void *p;
+
+	if (db_column_is_null(stmt, col))
+		return NULL;
+
+	if (sourcelen % bytes != 0)
+		db_fatal("%s: column size %zu not a multiple of %s (%zu)",
+			 caller, sourcelen, label, bytes);
+
+	p = tal_arr_label(ctx, char, sourcelen, label);
+	memcpy(p, db_column_blob(stmt, col), sourcelen);
+	return p;
 }
 
 void db_column_amount_msat(struct db_stmt *stmt, int col,

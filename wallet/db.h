@@ -280,8 +280,18 @@ void db_column_secret(struct db_stmt *stmt, int col, struct secret *s);
 void db_column_txid(struct db_stmt *stmt, int pos, struct bitcoin_txid *t);
 void db_column_node_id(struct db_stmt *stmt, int pos, struct node_id *ni);
 void db_column_pubkey(struct db_stmt *stmt, int pos, struct pubkey *p);
+bool db_column_short_channel_id(struct db_stmt *stmt, int col,
+				struct short_channel_id *dest);
 bool db_column_signature(struct db_stmt *stmt, int col,
 			 secp256k1_ecdsa_signature *sig);
+struct bitcoin_tx *db_column_tx(const tal_t *ctx, struct db_stmt *stmt, int col);
+
+#define db_column_arr(ctx, stmt, col, type)			\
+	((type *)db_column_arr_((ctx), (stmt), (col),		\
+				sizeof(type), TAL_LABEL(type, "[]"),	\
+				__func__))
+void *db_column_arr_(const tal_t *ctx, struct db_stmt *stmt, int col,
+		     size_t bytes, const char *label, const char *caller);
 
 void db_close(struct db *db);
 bool db_exec_prepared_v2(struct db_stmt *stmt TAKES);
